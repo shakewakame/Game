@@ -164,7 +164,10 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
 .ez{font-size:.8rem;font-weight:700;color:var(--sashiko)}
 .ez.good{color:#86dfa6}.ez.bad{color:#ff9a90}
 .combo{display:flex;flex-direction:column;gap:.5rem}
-.combo .ds{font-size:.85rem;color:var(--sashiko)}
+.combo .ds{font-size:.85rem;color:var(--sashiko);line-height:1.7}
+.pairrow{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:.92rem}
+.pairrow i{width:.9em;height:.9em;border-radius:50%;flex:none}
+.pairrow span{margin-left:auto;font-size:.75rem;color:var(--muted);font-weight:500}
 @media (prefers-reduced-motion:reduce){.hint,.chip.live::before{animation:none}}
 </style>
 
@@ -305,36 +308,40 @@ const $=id=>document.getElementById(id);
 /* ---------- data: real needles & threads ---------- */
 // E = eye length, h = shaft thickness, T = thread thickness (game units, 1u ≈ 0.08mm)
 const NEEDLES=[
-  {id:'beads', name:'ビーズ針', E:6,  h:8,  price:0,    hard:true, desc:'ビーズを通すための極細の針。穴はとても小さい。上級者向け。'},
-  {id:'meriken',name:'メリケン針',E:10, h:12, price:0,   desc:'いちばん普通の縫い針。明治時代にアメリカ（メリケン）から伝わったのが名前の由来。'},
-  {id:'shishu',name:'刺しゅう針',E:15, h:14, price:1200, desc:'何本もの糸を通すため、穴が細長く大きく作られている。'},
-  {id:'toji',  name:'毛糸とじ針',E:24, h:22, price:6000,desc:'編み物をとじる太い針。先が丸く、穴がとても大きい。'},
+  {id:'beads', name:'ビーズ針', E:9,  h:9,  price:0,    hard:true, desc:'ビーズを通すための極細の針。穴はとても小さい。上級者向け。'},
+  {id:'meriken',name:'メリケン針',E:13, h:13, price:0,   desc:'いちばん普通の縫い針。明治時代にアメリカ（メリケン）から伝わったのが名前の由来。'},
+  {id:'shishu',name:'刺しゅう針',E:18, h:15, price:2850, unlock:30, desc:'何本もの糸を通すため、穴が細長く大きく作られている。'},
+  {id:'toji',  name:'毛糸とじ針',E:28, h:22, price:5650, unlock:50,desc:'編み物をとじる太い針。先が丸く、穴がとても大きい。'},
 ];
 const THREADS=[
-  {id:'keito', name:'毛糸（並太）',T:16, price:0,   hard:true, color:'#ecdcb8', fuzz:true, desc:'セーターを編む太い糸。普通の針にはまず入らない。毛糸とじ針なら……？'},
-  {id:'tako',  name:'タコ糸',      T:9,  price:0,   hard:true, color:'#d9c49b', desc:'凧あげやチャーシューを縛る丈夫な木綿糸。'},
-  {id:'shishuito',name:'刺しゅう糸（6本どり）',T:6,price:0,hard:true,color:'#e2558a',desc:'細い糸が6本より合わさった糸。刺しゅう針と相性が良い。'},
-  {id:'tenui', name:'手縫い糸',    T:4,  price:0,   color:'#d2403a', desc:'ボタン付けや裾上げに使う普通の糸。'},
-  {id:'mishin',name:'ミシン糸（60番）',T:2.6,price:400,color:'#f3efe4',desc:'ミシン用の細い糸。「番手」の数字が大きいほど細くなる。'},
-  {id:'kinu',  name:'絹糸',        T:1.8,price:2500, color:'#e9c46a', sheen:true, desc:'蚕のまゆから作る、細くてつややかな糸。'},
-  {id:'tegusu',name:'テグス（0.6号）',T:1.2,price:9000,color:'rgba(214,236,255,.8)',desc:'釣り糸にも使う透明なナイロン糸。ビーズ針と相性が良い。'},
+  {id:'keito', name:'毛糸（並太）',T:22, price:0,   hard:true, color:'#ecdcb8', fuzz:true, desc:'セーターを編む太い糸。普通の針にはまず入らない。毛糸とじ針なら……？'},
+  {id:'tako',  name:'タコ糸',      T:12,  price:0,   hard:true, color:'#d9c49b', desc:'凧あげやチャーシューを縛る丈夫な木綿糸。'},
+  {id:'shishuito',name:'刺しゅう糸（6本どり）',T:10,price:0,hard:true,color:'#e2558a',desc:'細い糸が6本より合わさった糸。刺しゅう針と相性が良い。'},
+  {id:'tenui', name:'手縫い糸',    T:7,  price:0,   color:'#d2403a', desc:'ボタン付けや裾上げに使う普通の糸。'},
+  {id:'mishin',name:'ミシン糸（60番）',T:4.5,price:1050,unlock:5,color:'#f3efe4',desc:'ミシン用の細い糸。「番手」の数字が大きいほど細くなる。'},
+  {id:'kinu',  name:'絹糸',        T:3,price:1100,unlock:12, color:'#e9c46a', sheen:true, desc:'蚕のまゆから作る、細くてつややかな糸。'},
+  {id:'tegusu',name:'テグス（0.6号）',T:1.8,price:1200,unlock:20,color:'rgba(214,236,255,.8)',desc:'釣り糸にも使う透明なナイロン糸。ビーズ針と相性が良い。'},
 ];
-const COMPAT={'keito|toji':'毛糸とじ針','shishuito|shishu':'刺しゅう針','tenui|meriken':'メリケン針','tegusu|beads':'ビーズ針'};
+const COMPAT={'keito|toji':'毛糸とじ針','shishuito|shishu':'刺しゅう針','tegusu|beads':'ビーズ針'};
 const TOOLS=[
-  {id:'itotoshi',name:'糸通し',price:80,desc:'針金の輪で糸を引き込む、昔ながらの道具。1回だけ穴が大きく使える。'},
-  {id:'hasami', name:'糸切りばさみ',price:30,desc:'糸の先を斜めに切りそろえると通しやすくなる。1回だけ糸が細くなる。'},
+  {id:'itotoshi',name:'糸通し',price:120,desc:'針金の輪で糸を引き込む、昔ながらの道具。1つ使うと、そのステージをクリアするまで当たりの幅が大きく広がる。'},
+  {id:'hasami', name:'糸切りばさみ',price:40,desc:'糸の先を斜めに切って細く尖らせると、穴の縁に当たっても滑り込む。1つ使うと、そのステージをクリアするまで効果が続く。'},
 ];
 // matching needle and thread share a colour (the thread's own colour)
-const PAIR={keito:'#e8cf98',toji:'#e8cf98',shishuito:'#e2558a',shishu:'#e2558a',tenui:'#e0574f',meriken:'#e0574f',tegusu:'#7cc4f2',beads:'#7cc4f2'};
+const PAIR={keito:'#e8cf98',toji:'#e8cf98',shishuito:'#e2558a',shishu:'#e2558a',tegusu:'#7cc4f2',beads:'#7cc4f2'};
 function partnerOf(key,id){for(const k of Object.keys(COMPAT)){const [t,n]=k.split('|'); if(key==='needle'&&n===id) return THREADS.find(x=>x.id===t); if(key==='thread'&&t===id) return NEEDLES.find(x=>x.id===n);} return null;}
 const pdot=id=>PAIR[id]?`<i class="pd" style="background:${PAIR[id]}"></i>`:'';
 const DEFAULT_NEEDLE=NEEDLES[1], DEFAULT_THREAD=THREADS[3];
 const MM_PER_U=0.08;
-// economy: clearing all 100 stages earns roughly 10,000 coins; every needle and thread costs 19,100,
-// so the best gear needs ads or replays
-const REWARD={fail:2, compat:10, crown:15, ad:60};
-const successCoins=n=>5+Math.floor(n/5);   // stage 1: 5 … stage 100: 25
-const firstCoins=n=>10+n;                  // stage 1: 11 … stage 100: 110
+// economy: coins come from progress, not from replaying. Assuming ~15 misses per stage, each upgrade
+// unlocks a little before its target stage and costs ~12% more than what you will have earned by then
+// (mishin@8, kinu@16, tegusu@24, shishu@40, toji@65), so 1-4 ads close the gap.
+// Cleared stages pay nothing except a first crown.
+const REWARD={fail:5, crown:15, compatX:2};
+const clearCoins=n=>20+2*n;                                    // stage 1: 22 … stage 100: 220
+const clearedCount=()=>Object.keys(S.cleared).length;
+const adCoins=()=>50+2*clearedCount();                         // ads grow with progress
+const unlocked=it=>!it.unlock||!!S.cleared[it.unlock];
 
 /* ---------- stages ---------- */
 const CHAPTERS=[
@@ -399,7 +406,7 @@ function catPunch(t){const c=G.cfg.cat; if(!c) return 0; const u=mod(t,c.P), s0=
 function catWarn(t){const c=G.cfg.cat; if(!c) return 0; const u=mod(t,c.P), s0=c.P-c.len; return smooth(s0-1.1,s0-0.6,u)*(1-smooth(c.P-0.05,c.P,u));}
 
 /* ---------- save ---------- */
-const SAVE_KEY='hari-ana-challenge-v2';
+const SAVE_KEY='hari-ana-challenge-v3';
 const fresh=()=>({coins:100,cleared:{},crowns:{},tries:{},owned:{},eq:{needle:'meriken',thread:'tenui'},tools:{itotoshi:1,hasami:2},sound:true,seenCh:{}});
 let S=fresh();
 try{const raw=localStorage.getItem(SAVE_KEY); if(raw) S=Object.assign(fresh(),JSON.parse(raw));}catch(e){}
@@ -489,13 +496,14 @@ function needlePos(t){
   return {x,y};
 }
 function tolOf(E,T,use={}){
-  const t=T*(use.hasami?0.6:1);
+  const t=T*(use.hasami?0.5:1);
   if(t>E*1.05) return -1;
   let tol=(E-t)/2+Math.min(t*0.15,0.6);
-  if(use.itotoshi) tol+=5+E*0.25;
+  if(use.hasami) tol+=1.2;            // a pointed tip slides in off the rim
+  if(use.itotoshi) tol+=8+E*0.3;
   return tol;
 }
-function effThread(){return curThread().T*(G.use.hasami?0.6:1)}
+function effThread(){return curThread().T*(G.use.hasami?0.5:1)}
 function tolerance(){return tolOf(curNeedle().E,curThread().T,G.use)}
 function visUse(){return (G.st==='aim'||G.st==='retract')?G.armed:G.use}   // tools shown on screen: armed while aiming, in use while flying
 
@@ -510,7 +518,7 @@ function startStage(n){
   show(null); updateHud();
   const c=G.cfg;
   if(!S.seenCh[c.i]||(DBG.on&&DBG.intro)){showIntro(); S.seenCh[c.i]=1; save();}
-  else toast(`ステージ${n}`,c.ch.name,1.2);
+  else toast(`ステージ${n}`,S.cleared[n]?`${c.ch.name}（クリア済み：コインは出ません）`:c.ch.name,1.4);
   $('hint').hidden=false;
 }
 function showIntro(){
@@ -521,12 +529,12 @@ function showIntro(){
 function updateHud(){
   const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n} / ${STAGES}　${c.ch.name}`; const wl=windLevel(); const hw=$('hudWind'); hw.hidden=!c.wind;
   if(c.wind){hw.innerHTML=`風 <span class="arr">${(c.wind>0?'➤':'◀').repeat(wl)}</span> ${['弱い','ふつう','強い','暴風'][wl-1]}`; hw.style.setProperty('--gx',(c.wind>0?5:-5)+'px');}
-  const tries=(S.tries[c.n]||0)+1; $('hudTries').textContent=`挑戦 ${tries}回目`;
+  const tries=(S.tries[c.n]||0)+1; $('hudTries').textContent=`挑戦 ${tries}回目`; $('tAd').textContent=`広告を見て +${adCoins()}`;
   const nd=curNeedle(), th=curThread();
-  $('hudGear').innerHTML=`${pdot(nd.id)}${nd.name} × ${pdot(th.id)}${th.name}`+(isCompat()?`　<b style="color:${PAIR[th.id]}">相性◎</b>`:'')+(th.T>nd.E*1.05?'　<b>太すぎ…？</b>':'');
+  $('hudGear').innerHTML=`${pdot(nd.id)}${nd.name} × ${pdot(th.id)}${th.name}`+(isCompat()?`　<b style="color:${PAIR[th.id]}">相性◎ コイン2倍</b>`:'')+(th.T>nd.E*1.05?'　<b>太すぎ…？</b>':'');
   ['itotoshi','hasami'].forEach(k=>{
     const cap=k[0].toUpperCase()+k.slice(1);
-    $('n'+cap).textContent=S.tools[k]||0;
+    $('n'+cap).textContent=G.armed[k]?'使用中':(S.tools[k]||0);
     $('t'+cap).setAttribute('aria-pressed',G.armed[k]?'true':'false');
   });
   refreshCoins();
@@ -536,15 +544,14 @@ function launch(){
   if(G.demo){G.flyX=G.aimX; G.drift=0; G.v=300+c.D*0.22; G.rt=0; G.use={}; return;}
   G.st='fly'; G.flyX=G.aimX; G.drift=0; G.v=300+c.D*0.22; G.rt=0; G.heartT=0;
   G.use={};
-  for(const k of ['itotoshi','hasami']) if(G.armed[k]&&(S.tools[k]||0)>0){S.tools[k]--; G.use[k]=true;}
-  G.armed={itotoshi:false,hasami:false};
+  G.use={...G.armed};   // tools stay on until the stage is cleared
   S.tries[c.n]=(S.tries[c.n]||0)+1; save();
   $('hint').hidden=true; SFX.whoosh(); updateHud();
   $('hudTries').textContent=`挑戦 ${S.tries[c.n]}回目`;
 }
 function resolve(np){
   const nd=curNeedle(), T=effThread(); const dx=G.tipX-np.x; const tol=tolerance();
-  const ok=(DBG.on&&DBG.always&&!G.demo)||(tol>=0&&Math.abs(dx)<=tol);
+  const ok=(DBG.on&&DBG.always&&!G.demo)||(tol>=0&&Math.abs(dx)<=tol+0.15);
   const sideMiss=dx< -(nd.E/2+nd.h*0.8+T/2);
   G.res={dx,tol,ok,np}; G.rt=0;
   if(ok){
@@ -559,16 +566,18 @@ function resolve(np){
 function award(){
   const c=G.cfg, r=G.res, nd=curNeedle(), th=curThread();
   const lines=[]; let tot=0;
+  const fresh=!S.cleared[c.n];
   if(r.ok){
-    lines.push(['成功',successCoins(c.n)]);
-    if(!S.cleared[c.n]){lines.push(['初クリア',firstCoins(c.n)]); S.cleared[c.n]=1;}
-    if(isCompat()) lines.push([`相性ボーナス（${th.name}×${nd.name}）`,REWARD.compat]);
+    if(fresh){lines.push(['クリア報酬',clearCoins(c.n)]); S.cleared[c.n]=1;}
     const bare=nd.E<=DEFAULT_NEEDLE.E&&th.T>=DEFAULT_THREAD.T&&!G.use.itotoshi&&!G.use.hasami;
     r.crown=bare; r.newCrown=bare&&!S.crowns[c.n]; if(bare) S.crowns[c.n]=1;
     if(r.newCrown) lines.push(['王冠ボーナス',REWARD.crown]);
-  }else lines.push(['チャレンジ参加賞',REWARD.fail]);
-  lines.forEach(l=>tot+=l[1]); S.coins+=tot; save(); r.lines=lines; r.tot=tot;
-  floatText(`+${tot}`,W/2,H*0.5,'#e5b54c'); SFX.coin(); refreshCoins();
+  }else if(fresh) lines.push(['チャレンジ参加賞',REWARD.fail]);
+  lines.forEach(l=>tot+=l[1]);
+  if(isCompat()&&tot>0){lines.push([`相性◎ コイン2倍（${nd.name}×${th.name}）`,tot]); tot*=REWARD.compatX;}
+  S.coins+=tot; save(); r.lines=lines; r.tot=tot;
+  if(tot>0){floatText(`+${tot}`,W/2,H*0.5,'#e5b54c'); SFX.coin();}
+  refreshCoins();
 }
 function showResult(){
   const r=G.res, c=G.cfg, nd=curNeedle(), T=effThread();
@@ -579,7 +588,8 @@ function showResult(){
   if(r.crown){cb.hidden=false; cb.innerHTML=crownSvg(22)+(r.newCrown?' 素手クリア！王冠ゲット':' 素手クリア');} else cb.hidden=true;
   $('resLines').innerHTML=r.lines.map(([k,v])=>`<div><span>${k}</span><span class="coin">${v}</span></div>`).join('')+`<div class="tot"><span>合計</span><span class="coin">${r.tot}</span></div>`;
   $('resNext').hidden=c.n>=STAGES;
-  $('resDouble').hidden=false; $('resDouble').innerHTML=`広告を見て2倍にする（<span class="coin" style="color:inherit">+${r.tot}</span>）`;
+  $('resDouble').hidden=r.tot<=0;
+  if(r.tot<=0) $('resLines').innerHTML='<div><span>クリア済みのステージなので、コインはもらえません</span></div>'; $('resDouble').innerHTML=`広告を見て2倍にする（<span class="coin" style="color:inherit">+${r.tot}</span>）`;
   G.resultShown=true; show('result'); $('hud').hidden=true;
   if(c.n>=STAGES) $('resTries').textContent+='　全100ステージ制覇！';
 }
@@ -663,8 +673,8 @@ function update(dt){
         const r=G.res;
         if(r.cat) toast('ねこパンチ！','耳が見えたらパンチの合図。合間をねらおう',1.6);
         else if(r.tol<0) toast('太すぎて入らない！','穴より糸が太いみたい。お裁縫箱で針か糸を替えてみよう',2.4);
-        else if(G.st==='whiff') toast('空振り！',`穴まであと ${((Math.abs(r.dx)-r.tol)*MM_PER_U).toFixed(2)}mm`,1.4);
-        else{const miss=(Math.abs(r.dx)-r.tol)*MM_PER_U; toast(miss<0.25?'惜しい！':'おっと！',`あと ${miss.toFixed(2)}mm ${r.dx>0?'左':'右'}だった`,1.3);}
+        else if(G.st==='whiff') toast('空振り！',`穴まであと ${Math.max(0.01,(Math.abs(r.dx)-r.tol)*MM_PER_U).toFixed(2)}mm`,1.4);
+        else{const miss=(Math.abs(r.dx)-r.tol)*MM_PER_U; toast(miss<0.25?'惜しい！':'おっと！',`あと ${Math.max(0.01,miss).toFixed(2)}mm ${r.dx>0?'左':'右'}だった`,1.3);}
         award();
       }
     }
@@ -723,7 +733,7 @@ function drawThread(s,layer,ny){
   ctx.save();
   if(throughEye){ctx.beginPath(); if(layer==='back') ctx.rect(-1e5,-1e5,2e5,1e5+ny); else ctx.rect(-1e5,ny,2e5,1e5); ctx.clip();}
   const th=curThread(), T=th.T, nd=curNeedle();
-  const thin=!!visUse().hasami&&G.st!=='fail', Tt=T*0.6, cut=Math.min(36,Math.max(T*4,24));
+  const thin=!!visUse().hasami&&G.st!=='fail', Tt=T*0.5, cut=Math.min(36,Math.max(T*4,24));
   const tipX=G.tipX, tipY=G.tipY;
   const baseY=tipY+Math.max(700,H/s*1.3);
   const w=G.cfg.wind||0, bow=w*1.4*(1+0.18*Math.sin(G.tw*9));   // wind bends the hanging thread
@@ -776,7 +786,7 @@ function draw(){
   drawNeedle(cam.np.x,cam.np.y,nd);
   drawThread(cam.s,'front',cam.np.y);
   if(thr) drawThreaderLoop(cam.np,nd,cam.s,tolOf(nd.E,curThread().T,tu)*pull);
-  for(const p of G.snips){ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=curThread().color; const T0=curThread().T; ctx.fillRect(-T0/2,-6,T0,12); ctx.restore();}
+  for(const p of G.snips){ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=curThread().color; const T0=curThread().T; ctx.fillRect(-T0/2,-2.5,T0,5); ctx.restore();}
   ctx.restore();
 
   drawHand(cam,c);
@@ -1270,12 +1280,13 @@ $('hudBack').onclick=()=>{G.mode='menu'; G.demo=true; G.cfg=stageCfg(3); G.st='a
 for(const k of ['itotoshi','hasami']){
   const cap=k[0].toUpperCase()+k.slice(1);
   $('t'+cap).onclick=()=>{
+    if(G.armed[k]){toast('使用中','このステージをクリアするまで効果が続きます',1.4); return;}
     if((S.tools[k]||0)<=0){toast('持っていません','お裁縫箱で買えます',1.4); return;}
-    G.armed[k]=!G.armed[k];
+    S.tools[k]--; save();
+    G.armed[k]=true;
     const E=curNeedle().E, T=curThread().T, t0=tolOf(E,T,{...G.armed,[k]:false}), t1=tolOf(E,T,G.armed);
-    const eff= t1<0?'でも、まだ穴より太くて入らない': t0<0?'これで穴に入るようになった！':`当たりの幅が ${(t1/t0).toFixed(1)}倍 になった`;
-    if(!G.armed[k]){SFX.tap(); toast('使うのをやめました','',0.9);}
-    else if(k==='hasami'){
+    const eff= (t1<0?'でも、まだ穴より太くて入らない': t0<0?'これで穴に入るようになった！':`当たりの幅が ${(t1/t0).toFixed(1)}倍 に。`)+'クリアするまで続きます';
+    if(k==='hasami'){
       SFX.snip(); floatText('チョキン！',W*0.5,H*0.7,'#ece6d6',26);
       G.snips.push({x:G.tipX+4,y:G.tipY+2,vx:30,vy:-60,r:0.4,t:0});
       toast('チョキン！',`糸の先を斜めに切って細くした。${eff}`,2.4);
@@ -1287,7 +1298,7 @@ $('inStart').onclick=()=>{SFX.tap(); $('intro').hidden=true;};
 $('hudHelp').onclick=()=>{SFX.tap(); showIntro();};
 $('tAd').onclick=()=>playAd(()=>updateHud());
 
-function playAd(done,amount=REWARD.ad){
+function playAd(done,amount=adCoins()){
   audio(); const prev=[...document.querySelectorAll('.screen')].find(s=>!s.hidden);
   $('ad').hidden=false; let n=5; $('adCnt').textContent=n;
   const iv=setInterval(()=>{n--; $('adCnt').textContent=n; if(n<=0){clearInterval(iv); $('ad').hidden=true;
@@ -1346,30 +1357,35 @@ function renderShop(){
   const mm=t=>t<0?'入らない':`±${(t*MM_PER_U).toFixed(2)}mm`;
   if(shopTab==='needle'||shopTab==='thread'){
     html+=`<div class="patch combo"><div class="nm">いまの組み合わせ</div><canvas class="pv" data-pv="combo"></canvas>
-      <div class="ds">${pdot(cn.id)}${cn.name} × ${pdot(ct.id)}${ct.name}　当たりの幅 ${mm(t0)}${isCompat()?`　<b style="color:${PAIR[ct.id]}">相性◎</b>`:''}</div></div>`;
+      <div class="ds">${pdot(cn.id)}${cn.name} × ${pdot(ct.id)}${ct.name}　当たりの幅 ${mm(t0)}<br>${isCompat()?`<b style="color:${PAIR[ct.id]}">相性◎　もらえるコインが2倍</b>`:'相性ボーナスなし'}</div></div>`;
+    html+=`<div class="patch combo"><div class="nm">相性のいい組み合わせ</div>
+      <div class="ds">同じ色の針と糸を組み合わせると、<b>もらえるコインが2倍</b>になります。入りやすさは初期装備と同じくらいです。</div>
+      ${Object.keys(COMPAT).map(k=>{const [t,n]=k.split('|'), tt=THREADS.find(x=>x.id===t), nn=NEEDLES.find(x=>x.id===n), on=S.eq.thread===t&&S.eq.needle===n;
+        return `<div class="pairrow" style="color:${PAIR[t]}"><i style="background:${PAIR[t]}"></i>${nn.name} × ${tt.name}<span>${on?'使用中':(owns(nn)&&owns(tt)?'そろっている':'')}</span></div>`;}).join('')}</div>`;
     const list=shopTab==='needle'?NEEDLES:THREADS, key=shopTab;
     list.forEach(it=>{
       const eq=S.eq[key]===it.id, own=owns(it), mate=partnerOf(key,it.id);
       const t1= key==='needle'? tolOf(it.E,ct.T) : tolOf(cn.E,it.T);
       const btn= eq?`<button class="btn sub sm" disabled>使用中</button>`
         : own?`<button class="btn sub sm" data-eq="${key}:${it.id}">使う</button>`
+        : !unlocked(it)?`<button class="btn sub sm" disabled>ステージ${it.unlock}<br>クリアで入荷</button>`
         : `<button class="btn gold sm" data-buy="${key}:${it.id}" ${S.coins<it.price?'disabled':''}><span class="coin" style="color:inherit">${it.price.toLocaleString()}</span></button>`;
       const tags=(it.hard?'<span class="tag hard">むずかしい</span>':'')+(it.id===(key==='needle'?'meriken':'tenui')?'<span class="tag">初期装備</span>':'');
       html+=`<div class="patch item${mate?' has-pair':''}" style="--pair:${PAIR[it.id]||'transparent'}">
         <div><div class="nm">${pdot(it.id)}${it.name}${tags}</div><div class="meter">${eq?'<span class="ez">使用中</span>':easeTag(t1,t0)}</div></div>${btn}
         <canvas class="pv" data-pv="${key}:${it.id}"></canvas>
-        <div class="ds">${it.desc}${mate?`<span class="pairline" style="color:${PAIR[it.id]}"><i style="background:${PAIR[it.id]}"></i>同じ色の${key==='needle'?'糸':'針'}と相性◎：${mate.name}（成功時 +${REWARD.compat}コイン）</span>`:''}</div></div>`;
+        <div class="ds">${it.desc}${mate?`<span class="pairline" style="color:${PAIR[it.id]}"><i style="background:${PAIR[it.id]}"></i>同じ色の${key==='needle'?'糸':'針'}（${mate.name}）と組み合わせると コイン2倍</span>`:''}</div></div>`;
     });
   }else if(shopTab==='tool'){
     TOOLS.forEach(it=>{
       const t1=tolOf(cn.E,ct.T,{[it.id]:true});
-      html+=`<div class="patch item"><div><div class="nm">${it.name}</div><div class="meter">持っている数：${S.tools[it.id]||0}　${easeTag(t1,t0).replace('今より','今の装備で')}</div></div>
+      html+=`<div class="patch item"><div><div class="nm">${it.name}</div><div class="meter">持っている数：${S.tools[it.id]||0}　${easeTag(t1,t0).replace('今より','クリアまでずっと')}</div></div>
         <button class="btn gold sm" data-tool="${it.id}" ${S.coins<it.price?'disabled':''}><span class="coin" style="color:inherit">${it.price}</span></button>
         <canvas class="pv" data-pv="tool:${it.id}"></canvas>
-        <div class="ds">${it.desc}<br>ゲーム画面の下のボタンで、次の1回に使います。使うと王冠（素手クリア）はもらえません。</div></div>`;
+        <div class="ds">${it.desc}<br>ゲーム画面の下のボタンで使います。ステージを出ると効果はなくなります。使うと王冠（素手クリア）はもらえません。</div></div>`;
     });
   }else{
-    html+=`<div class="patch item"><div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${REWARD.ad}コイン</div></div>
+    html+=`<div class="patch item"><div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${adCoins()}コイン（クリアしたステージが多いほど増える）</div></div>
       <button class="btn gold sm" id="shopAd">見る</button><div class="ds">試作版ではダミーの画面が5秒出ます。</div></div>`;
     [['ひとつかみ',500,'120円'],['お裁縫箱いっぱい',1800,'370円'],['呉服屋さん',5500,'980円']].forEach(([n,c,p])=>{
       html+=`<div class="patch item"><div><div class="nm">${n}</div><div class="meter"><span class="coin">${c.toLocaleString()}</span></div></div>
@@ -1404,7 +1420,7 @@ function drawPreview(cv){
 }
 function drawCloseup(g,x0,x1,h,nd,th,use){
   const k=2.8, cx=x0+(x1-x0)*0.42, cy=h*0.46;
-  const E=nd.E*k, hh=Math.min(nd.h*k*0.8,36), hi=hh*0.42, T=th.T*k, Tt=use.hasami?T*0.6:T;
+  const E=nd.E*k, hh=Math.min(nd.h*k*0.8,36), hi=hh*0.42, T=th.T*k, Tt=use.hasami?T*0.5:T;
   const tol=tolOf(nd.E,th.T,use), fits=tol>=0;
   g.save(); g.beginPath(); g.rect(x0,0,x1-x0,h); g.clip();
   g.lineCap='butt';
