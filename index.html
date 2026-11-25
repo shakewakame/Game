@@ -281,6 +281,11 @@ const CHAPTERS=[
   {from:30,to:30,name:'はるか彼方',sub:'最終ステージ', tip:'はるか彼方。穴は見えるか？'},
 ];
 function windLevel(){const w=Math.abs(G.cfg.wind); return w<12?1:w<22?2:w<30?3:4;}
+const SLOW={start:85,end:9,depth:0.9,vmin:170,vk:4.5};
+// world time the thread takes to reach the needle (used to make wind stages solvable)
+function flyTime(D){let y=0,t=0; const v=300+D*0.22, dt=1/240;
+  while(y>-D){const r=y+D, sm=smooth(SLOW.start,SLOW.end,r), ts=1-SLOW.depth*sm; y-=Math.min(v,SLOW.vmin+Math.max(r,0)*SLOW.vk)*dt*ts; t+=dt*ts;}
+  return t;}
 function chapterOf(n){return CHAPTERS.find(c=>n>=c.from&&n<=c.to)}
 function stageCfg(n){
   const ch=chapterOf(n), i=CHAPTERS.indexOf(ch);
@@ -294,6 +299,8 @@ function stageCfg(n){
   if(i===3){c.shake={K:9+(n-16)*2.5,J:1.9-(n-16)*0.1};}
   if(i===4){c.tremble=1.6+(n-21)*0.6; c.sway={S:6,P:4};}
   if(i===5){c.sway={S:14+(n-26)*3,P:3.1}; c.bob=10; c.wind=(n%2?1:-1)*8; c.pattern='sine';}
+  // wind: place the needle so that the right aim is inside the thread's swing (aim = needle − drift)
+  if(c.wind){c.offX=c.wind*flyTime(c.D)+[0.3,-0.25,0.15,-0.35][n%4]*c.A;}
   if(i===6){c.D=3300; c.speed=70; c.sway={S:8,P:5}; c.pattern='sine'; c.offX=0;}
   return c;
 }
@@ -338,21 +345,9 @@ function tone(t,dur,f1,f2,{type='sine',g=0.3}={}){
   const gn=a.createGain(); gn.gain.setValueAtTime(0,t); gn.gain.linearRampToValueAtTime(g,t+0.005); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur);
   o.connect(gn); gn.connect(master); o.start(t); o.stop(t+dur+0.05);
 }
-let droneG=null, droneO=null, droneHi=null;
-function drone(v){
-  if(!AC||!S.sound){return}
-  if(!droneG){
-    droneG=AC.createGain(); droneG.gain.value=0; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=320;
-    droneO=AC.createOscillator(); droneO.type='sawtooth'; droneO.frequency.value=55; droneO.connect(lp); lp.connect(droneG);
-    droneHi=AC.createOscillator(); droneHi.type='sine'; droneHi.frequency.value=2600; const hg=AC.createGain(); hg.gain.value=0.05; droneHi.connect(hg); hg.connect(droneG);
-    droneG.connect(master); droneO.start(); droneHi.start();
-  }
-  const t=AC.currentTime; droneG.gain.setTargetAtTime(v*0.16,t,0.06); droneO.frequency.setTargetAtTime(55+v*30,t,0.1); droneHi.frequency.setTargetAtTime(2400+v*900,t,0.1);
-}
 const SFX={
   slip(){if(!audio())return; const t=AC.currentTime; noise(t,0.35,{type:'highpass',f:3500,g:0.35,attack:0.04}); tone(t,0.5,880,1760,{g:0.12});},
   whoosh(){if(!audio())return; const t=AC.currentTime; noise(t,0.25,{f:700,q:0.8,g:0.25,attack:0.05});},
-  heart(){if(!audio())return; const t=AC.currentTime; tone(t,0.14,70,45,{g:0.55}); tone(t+0.18,0.12,62,42,{g:0.35});},
   cracker(){if(!audio())return; const t=AC.currentTime;
     [[-0.7,0],[0.7,0.09]].forEach(([p,d])=>{noise(t+d,0.3,{type:'highpass',f:900,g:0.9,pan:p}); tone(t+d,0.09,160,60,{g:0.5}); noise(t+d+0.02,0.5,{f:5000,q:2,g:0.12,pan:p});});},
   applause(){if(!audio())return; const t=AC.currentTime+0.15;
@@ -390,7 +385,7 @@ window.addEventListener('resize',resize);
 /* ---------- game state ---------- */
 const G={mode:'menu',n:1,cfg:stageCfg(1),tw:0,ts:1,phase:0,aimX:0,tipX:0,tipY:0,baseX:0,flyX:0,drift:0,v:300,
   st:'aim',rt:0,camK:0,sm:0,bend:0,bendDir:1,res:null,armed:{itotoshi:false,hasami:false},use:{},
-  heartT:0,shakePx:0,pulse:0,flash:0,fanA:0,heartFx:[],focus:[],focusT:0,fluff:[],passed:false,lastJolt:-1,confetti:[],floats:[],streaks:[],demo:true,resultShown:false};
+  shakePx:0,flash:0,fanA:0,focus:[],fluff:[],passed:false,lastJolt:-1,confetti:[],floats:[],streaks:[],demo:true,resultShown:false};
 
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -540,22 +535,21 @@ function update(dt){
     const r=G.tipY-np.y;
     const zone=Math.max(110,Math.min(c.D*0.55,520));
     G.camK=smooth(zone,20,r);
-    G.sm=smooth(115,8,r); G.ts=1-0.94*G.sm;
+    G.sm=smooth(SLOW.start,SLOW.end,r); G.ts=1-SLOW.depth*G.sm;
     G.drift+=c.wind*dtw;
-    const vEff=Math.min(G.v,150+Math.max(r,0)*4);
+    const vEff=Math.min(G.v,SLOW.vmin+Math.max(r,0)*SLOW.vk);
     G.tipY-=vEff*dtw;
     G.tipX=G.flyX+G.drift+trem(G.tw);
-    if(G.sm>0.3&&!G.demo){G.heartT-=dt; if(G.heartT<=0){SFX.heart(); G.pulse=1; G.heartFx.push({t:0,side:G.heartFx.length%2}); G.heartT=lerp(0.75,0.34,G.sm);}}
     if(G.tipY<=np.y) resolve(np);
   }
   else if(G.st==='pass'){
     // hit-stop, then a slow pull through the eye, then back to normal speed
-    G.ts= G.rt<0.14?0.0: G.rt<0.6?0.12: lerp(0.12,1,smooth(0.6,1.1,G.rt));
-    G.sm=1-smooth(0.5,1.2,G.rt);
+    G.ts= G.rt<0.1?0.0: G.rt<0.4?0.15: lerp(0.15,1,smooth(0.4,0.8,G.rt));
+    G.sm=1-smooth(0.35,0.9,G.rt);
     const target=np.y-80; G.tipY=Math.max(target,G.tipY-120*dtw*(1+G.rt*3));
     G.tipX=np.x+G.relX;
-    if(G.rt>=0.5&&!G.res.burst){G.res.burst=true; if(!G.demo){burst(); SFX.cracker(); SFX.applause(); vibrate([30,40,60]); award();}}
-    if(!G.demo&&G.rt>2.0&&!G.resultShown) showResult();
+    if(G.rt>=0.35&&!G.res.burst){G.res.burst=true; if(!G.demo){burst(); SFX.cracker(); SFX.applause(); vibrate([30,40,60]); award();}}
+    if(!G.demo&&G.rt>1.8&&!G.resultShown) showResult();
     if(G.demo&&G.rt>2.4) retract();
   }
   else if(G.st==='fail'||G.st==='whiff'){
@@ -580,9 +574,7 @@ function update(dt){
     if(G.rt>=0.34){G.st='aim'; G.tipX=G.aimX; G.passed=false; if(G.mode==='play') updateHud();}
   }
   G.baseX+=(G.tipX-G.baseX)*clamp(dt*2.5,0,1);
-  G.pulse*=Math.exp(-dt*7); G.flash=Math.max(0,G.flash-dt*3.5); G.fanA+=dt*(4+Math.abs(c.wind)*0.5)*Math.sign(c.wind||1);
-  for(const h of G.heartFx) h.t+=dt; G.heartFx=G.heartFx.filter(h=>h.t<0.7);
-  drone(G.mode==='play'&&!G.demo&&G.st==='fly'?G.sm:0);
+  G.flash=Math.max(0,G.flash-dt*3.5); G.fanA+=dt*(4+Math.abs(c.wind)*0.5)*Math.sign(c.wind||1);
 
   // confetti & floats (real time)
   for(const p of G.confetti){p.vy+=1100*dt; p.vx*=Math.exp(-dt*1.6); p.vy*=Math.exp(-dt*1.2); p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.vr*dt; p.life-=dt;}
@@ -601,13 +593,13 @@ function camera(){
   const c0x=c.offX*0.5, c0y=-c.D-(H*0.24-H/2)/s0;
   const s1=Math.min(W/(nd.E*2.2+34), 11);
   const k=G.camK*G.camK*(3-2*G.camK);
-  const s=Math.exp(lerp(Math.log(s0),Math.log(s1),k))*(1+0.035*G.pulse*G.sm);
+  const s=Math.exp(lerp(Math.log(s0),Math.log(s1),k));
   // keep the eye on screen while zooming: move its screen position toward the centre
   const ex0=(np.x-c0x)*s0+W/2, ey0=(np.y-c0y)*s0+H/2;
   const ex=lerp(ex0,W/2,k), ey=lerp(ey0,H*0.46,k);
   let cx=np.x-(ex-W/2)/s, cy=np.y-(ey-H/2)/s;
   if(G.shakePx>0.3){cx+=(Math.random()-.5)*G.shakePx/s; cy+=(Math.random()-.5)*G.shakePx/s;}
-  return {s,cx,cy,np,tilt:0.035*G.sm*Math.sign(c.offX||1)};
+  return {s,cx,cy,np};
 }
 function drawNeedle(x,y,nd){
   const E=nd.E,h=nd.h,L=300+E*3, xl=x-E/2-h*0.85, xr=x+L, r=h/2;
@@ -668,7 +660,7 @@ function draw(){
   if(G.sm>0.01){ctx.fillStyle=`rgba(5,8,16,${0.55*G.sm})`; ctx.fillRect(0,0,W,H);}   // dim the room
   const cam=camera(), nd=curNeedle();
   ctx.save();
-  ctx.translate(W/2,H/2); ctx.rotate(cam.tilt); ctx.scale(cam.s,cam.s); ctx.translate(-cam.cx,-cam.cy);
+  ctx.translate(W/2,H/2); ctx.scale(cam.s,cam.s); ctx.translate(-cam.cx,-cam.cy);
   drawThread(cam.s,'back',cam.np.y);
   drawNeedle(cam.np.x,cam.np.y,nd);
   drawThread(cam.s,'front',cam.np.y);
@@ -689,11 +681,7 @@ function draw(){
     g.addColorStop(0,'rgba(5,8,16,0)'); g.addColorStop(1,`rgba(5,8,16,${0.7*G.sm})`);
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
     drawFocusLines();
-    const bh=H*0.12*G.sm; ctx.fillStyle='#05080f'; ctx.fillRect(0,0,W,bh); ctx.fillRect(0,H-bh,W,bh);
-    // manga-style heartbeat text
-    ctx.textAlign='center'; ctx.font='900 34px "Zen Maru Gothic",system-ui,sans-serif';
-    for(const h of G.heartFx){const a=1-h.t/0.7; ctx.save(); ctx.globalAlpha=a*G.sm; ctx.translate(h.side?W*0.8:W*0.2,H*0.28+h.t*-20); ctx.rotate(h.side?0.2:-0.2); ctx.scale(1+h.t*0.6,1+h.t*0.6);
-      ctx.lineWidth=6; ctx.strokeStyle='#05080f'; ctx.strokeText('ドクン',0,0); ctx.fillStyle='#d2403a'; ctx.fillText('ドクン',0,0); ctx.restore();}
+    const bh=H*0.09*G.sm; ctx.fillStyle='#05080f'; ctx.fillRect(0,0,W,bh); ctx.fillRect(0,H-bh,W,bh);
   }
   if(G.flash>0){ctx.fillStyle=`rgba(255,250,235,${G.flash*0.75})`; ctx.fillRect(0,0,W,H);}
   // confetti
@@ -706,11 +694,10 @@ function draw(){
 }
 
 function drawFocusLines(){
-  // 集中線: radial speed lines pointing at the eye, re-drawn ~14 times a second
-  const now=performance.now();
-  if(now-G.focusT>70){G.focusT=now; G.focus=[]; for(let i=0;i<90;i++) G.focus.push({a:Math.random()*Math.PI*2,r:0.42+Math.random()*0.22,w:0.004+Math.random()*0.012});}
+  // 集中線: a few thin, steady radial lines pointing at the eye
+  if(!G.focus.length){for(let i=0;i<32;i++) G.focus.push({a:(i+Math.random()*0.6)/32*Math.PI*2,r:0.5+Math.random()*0.15,w:0.003+Math.random()*0.004});}
   const cx=W/2, cy=H*0.46, R=Math.hypot(W,H)*0.75, rIn=Math.min(W,H);
-  ctx.fillStyle=`rgba(236,230,214,${0.5*G.sm})`;
+  ctx.fillStyle=`rgba(236,230,214,${0.22*G.sm})`;
   for(const f of G.focus){const r0=f.r*rIn*(1.25-0.25*G.sm);
     ctx.beginPath(); ctx.moveTo(cx+Math.cos(f.a)*r0,cy+Math.sin(f.a)*r0);
     ctx.lineTo(cx+Math.cos(f.a-f.w)*R,cy+Math.sin(f.a-f.w)*R); ctx.lineTo(cx+Math.cos(f.a+f.w)*R,cy+Math.sin(f.a+f.w)*R); ctx.fill();}
