@@ -307,6 +307,11 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
+// RELEASE is set by scripts/build.mjs for the store build; NATIVE is true inside the Android app
+const RELEASE=!!window.HARI_RELEASE;
+const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+// AdMob rewarded unit. This is Google's public TEST unit; replace it with your own before publishing.
+const AD_REWARDED_ID=window.HARI_AD_REWARDED_ID||'ca-app-pub-3940256099942544/5224354917';
 
 /* ---------- data: real needles & threads ---------- */
 // E = eye length, h = shaft thickness, T = thread thickness (game units, 1u ≈ 0.08mm)
@@ -1373,7 +1378,41 @@ $('inStart').onclick=()=>{SFX.tap(); $('intro').hidden=true;};
 $('hudHelp').onclick=()=>{SFX.tap(); showIntro();};
 $('tAd').onclick=()=>playAd(()=>updateHud());
 
+let adReady=false;
+async function initAds(){
+  if(!NATIVE) return;
+  const A=window.Capacitor.Plugins.AdMob; if(!A) return;
+  try{
+    await A.initialize({});
+    const info=await A.requestConsentInfo();
+    if(info&&info.status==='REQUIRED'&&info.isConsentFormAvailable) await A.showConsentForm();
+    adReady=true;
+  }catch(e){console.warn('admob init',e)}
+}
+function nativeRewarded(){
+  // resolves true only when the viewer earned the reward
+  return new Promise(async res=>{
+    const A=window.Capacitor.Plugins.AdMob; let earned=false; const hs=[];
+    const done=v=>{hs.forEach(h=>h&&h.remove&&h.remove()); res(v);};
+    try{
+      hs.push(await A.addListener('onRewardedVideoAdReward',()=>{earned=true;}));
+      hs.push(await A.addListener('onRewardedVideoAdDismissed',()=>done(earned)));
+      hs.push(await A.addListener('onRewardedVideoAdFailedToShow',()=>done(false)));
+      await A.prepareRewardVideoAd({adId:AD_REWARDED_ID});
+      await A.showRewardVideoAd();
+    }catch(e){done(earned);}
+  });
+}
 function playAd(done,amount=adCoins()){
+  if(NATIVE){
+    audio(); if(AC) AC.suspend();
+    nativeRewarded().then(ok=>{
+      if(AC&&S.sound) AC.resume();
+      if(ok){S.coins+=amount; save(); refreshCoins(); SFX.coin(); toast(`+${amount}コイン`,'広告を見てくれてありがとう',1.4); done&&done();}
+      else toast('広告を読み込めませんでした','時間をおいてもう一度お試しください',1.8);
+    });
+    return;
+  }
   audio(); const prev=[...document.querySelectorAll('.screen')].find(s=>!s.hidden);
   $('ad').hidden=false; let n=5; $('adCnt').textContent=n;
   const iv=setInterval(()=>{n--; $('adCnt').textContent=n; if(n<=0){clearInterval(iv); $('ad').hidden=true;
@@ -1461,8 +1500,8 @@ function renderShop(){
     });
   }else{
     html+=`<div class="patch item"><div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${adCoins()}コイン（章をクリアするごとに +50）</div></div>
-      <button class="btn gold sm" id="shopAd">見る</button><div class="ds">試作版ではダミーの画面が5秒出ます。</div></div>`;
-    [['ひとつかみ',500,'120円'],['お裁縫箱いっぱい',1800,'370円'],['呉服屋さん',5500,'980円']].forEach(([n,c,p])=>{
+      <button class="btn gold sm" id="shopAd">見る</button>${NATIVE?'':'<div class="ds">ブラウザ版ではダミーの画面が5秒出ます。</div>'}</div>`;
+    if(!RELEASE) [['ひとつかみ',500,'120円'],['お裁縫箱いっぱい',1800,'370円'],['呉服屋さん',5500,'980円']].forEach(([n,c,p])=>{
       html+=`<div class="patch item"><div><div class="nm">${n}</div><div class="meter"><span class="coin">${c.toLocaleString()}</span></div></div>
         <button class="btn sub sm" disabled>${p}</button><div class="ds">アプリ版で購入できるようになります。</div></div>`;
     });
@@ -1565,7 +1604,7 @@ $('resList').onclick=()=>{SFX.tap(); G.mode='menu'; G.demo=true; G.st='aim'; G.c
 $('stShop').onclick=()=>{SFX.tap(); openShop('stages');};
 
 /* ---------- debug mode (tap the title 5 times, or open the page with #debug) ---------- */
-function setDebug(v){DBG.on=v; saveDbg(); $('hudDbg').hidden=!v; $('titleDbg').hidden=!v; if(!v) $('dbg').hidden=true; toast(v?'デバッグモード ON':'デバッグモード OFF','',1.2);}
+function setDebug(v){ if(RELEASE) return;DBG.on=v; saveDbg(); $('hudDbg').hidden=!v; $('titleDbg').hidden=!v; if(!v) $('dbg').hidden=true; toast(v?'デバッグモード ON':'デバッグモード OFF','',1.2);}
 let logoTaps=0,logoT=0;
 document.querySelector('.logo').addEventListener('click',()=>{const n=performance.now(); logoTaps=(n-logoT<700)?logoTaps+1:1; logoT=n; if(logoTaps>=5){logoTaps=0; setDebug(!DBG.on);}});
 function checkHash(){if(location.hash==='#debug'&&!DBG.on) setDebug(true);}
@@ -1606,7 +1645,8 @@ $('dbgWipe').onclick=()=>{
 };
 
 /* ---------- boot ---------- */
-resize(); renderSound(); refreshCoins(); $('hudDbg').hidden=!DBG.on; $('titleDbg').hidden=!DBG.on; checkHash(); G.cfg=stageCfg(3); makeStreaks();
+if(RELEASE){DBG.on=false; document.querySelector('.proto').hidden=true;}
+resize(); renderSound(); refreshCoins(); $('hudDbg').hidden=!DBG.on; $('titleDbg').hidden=!DBG.on; checkHash(); initAds(); G.cfg=stageCfg(3); makeStreaks();
 requestAnimationFrame(t=>{last=t; frame(t);});
 })();
 </script>

@@ -1,0 +1,8 @@
+{
+  "appId": "com.harinoana.challenge",
+  "appName": "針の穴チャレンジ",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#1d2b4a"
+  }
+}

@@ -1,0 +1,67 @@
+name: Android build
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore: ['README.md', 'store/**', 'docs/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the game page and sync it into the Android project
+        env:
+          HARI_AD_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+        run: |
+          npm run build
+          npx cap sync android
+
+      - name: Build test APK (install this on your phone)
+        working-directory: android
+        env:
+          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hari-no-ana-test-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Build signed bundle for Google Play (only when the upload key is set)
+        if: ${{ env.HAS_KEY == 'true' }}
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          KEYSTORE_FILE="$RUNNER_TEMP/upload.jks" ./gradlew --no-daemon bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('android/app/build/outputs/bundle/release/*.aab') != '' }}
+        with:
+          name: hari-no-ana-play-bundle
+          path: android/app/build/outputs/bundle/release/app-release.aab
