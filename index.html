@@ -156,6 +156,15 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
 .dbg-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 .tgl{border:0;border-radius:10px;padding:.65rem .5rem;background:var(--ai-soft);font-weight:700;font-size:.85rem}
 .tgl[aria-pressed="true"]{background:var(--kin);color:var(--ai-deep)}
+.pd{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:.25em;vertical-align:-.02em;box-shadow:0 0 0 1.5px rgba(0,0,0,.35)}
+.item .pv,.combo .pv{grid-column:1/-1;display:block;width:100%;height:84px;border-radius:10px;background:rgba(0,0,0,.22)}
+.item.has-pair{box-shadow:inset 7px 0 0 var(--pair),0 10px 30px rgba(0,0,0,.35)}
+.pairline{display:flex;align-items:center;gap:.4rem;margin-top:.35rem;font-weight:700}
+.pairline i{width:.8em;height:.8em;border-radius:50%;flex:none}
+.ez{font-size:.8rem;font-weight:700;color:var(--sashiko)}
+.ez.good{color:#86dfa6}.ez.bad{color:#ff9a90}
+.combo{display:flex;flex-direction:column;gap:.5rem}
+.combo .ds{font-size:.85rem;color:var(--sashiko)}
 @media (prefers-reduced-motion:reduce){.hint,.chip.live::before{animation:none}}
 </style>
 
@@ -178,6 +187,7 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
     <div class="hud-bottom">
       <div class="hint" id="hint">画面をタップして糸を通す</div>
       <div class="tools">
+        <button class="tool" id="tShop">お裁縫箱</button>
         <button class="tool" id="tItotoshi" aria-pressed="false">糸通し <span class="n" id="nItotoshi">0</span></button>
         <button class="tool" id="tHasami" aria-pressed="false">糸切りばさみ <span class="n" id="nHasami">0</span></button>
         <button class="tool ad" id="tAd">広告を見て +60</button>
@@ -314,6 +324,10 @@ const TOOLS=[
   {id:'itotoshi',name:'糸通し',price:80,desc:'針金の輪で糸を引き込む、昔ながらの道具。1回だけ穴が大きく使える。'},
   {id:'hasami', name:'糸切りばさみ',price:30,desc:'糸の先を斜めに切りそろえると通しやすくなる。1回だけ糸が細くなる。'},
 ];
+// matching needle and thread share a colour (the thread's own colour)
+const PAIR={keito:'#e8cf98',toji:'#e8cf98',shishuito:'#e2558a',shishu:'#e2558a',tenui:'#e0574f',meriken:'#e0574f',tegusu:'#7cc4f2',beads:'#7cc4f2'};
+function partnerOf(key,id){for(const k of Object.keys(COMPAT)){const [t,n]=k.split('|'); if(key==='needle'&&n===id) return THREADS.find(x=>x.id===t); if(key==='thread'&&t===id) return NEEDLES.find(x=>x.id===n);} return null;}
+const pdot=id=>PAIR[id]?`<i class="pd" style="background:${PAIR[id]}"></i>`:'';
 const DEFAULT_NEEDLE=NEEDLES[1], DEFAULT_THREAD=THREADS[3];
 const MM_PER_U=0.08;
 // economy: clearing all 100 stages earns roughly 10,000 coins; every needle and thread costs 19,100,
@@ -439,6 +453,7 @@ const SFX={
   boing(){if(!audio())return; const t=AC.currentTime; tone(t,0.06,900,380,{type:'triangle',g:0.25}); tone(t+0.06,0.32,340,170,{type:'sine',g:0.28});},
   whiff(){if(!audio())return; const t=AC.currentTime; tone(t,0.35,600,1200,{type:'sine',g:0.12});},
   meow(){if(!audio())return; const t=AC.currentTime; tone(t,0.35,520,820,{type:'triangle',g:0.08}); tone(t+0.12,0.3,820,560,{type:'triangle',g:0.06});},
+  snip(){if(!audio())return; const t=AC.currentTime; noise(t,0.04,{type:'highpass',f:4000,g:0.5}); noise(t+0.07,0.05,{type:'highpass',f:3200,g:0.45}); tone(t+0.07,0.05,2400,1800,{type:'square',g:0.04});},
   gatan(){if(!audio())return; const t=AC.currentTime; tone(t,0.12,90,50,{g:0.45}); noise(t,0.08,{type:'lowpass',f:400,g:0.3});},
   tap(){if(!audio())return; const t=AC.currentTime; tone(t,0.05,700,500,{type:'triangle',g:0.12});},
 };
@@ -456,7 +471,7 @@ window.addEventListener('resize',resize);
 /* ---------- game state ---------- */
 const G={mode:'menu',n:1,cfg:stageCfg(1),tw:0,ts:1,phase:0,aimX:0,tipX:0,tipY:0,baseX:0,flyX:0,drift:0,v:300,
   st:'aim',rt:0,camK:0,sm:0,bend:0,bendDir:1,res:null,armed:{itotoshi:false,hasami:false},use:{},
-  shakePx:0,flash:0,fanA:0,focus:[],fluff:[],passed:false,lastJolt:-1,confetti:[],floats:[],streaks:[],demo:true,resultShown:false};
+  shakePx:0,flash:0,snips:[],fanA:0,focus:[],fluff:[],passed:false,lastJolt:-1,confetti:[],floats:[],streaks:[],demo:true,resultShown:false};
 
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -473,14 +488,16 @@ function needlePos(t){
   if(c.float){x+=c.float.Sx*Math.sin(2*Math.PI*t/c.float.Px); y+=c.float.Sy*Math.sin(2*Math.PI*t/c.float.Py+1);}
   return {x,y};
 }
-function effThread(){return curThread().T*(G.use.hasami?0.6:1)}
-function tolerance(){
-  const E=curNeedle().E, T=effThread();
-  if(T>E*1.05) return -1;
-  let tol=(E-T)/2+Math.min(T*0.15,0.6);
-  if(G.use.itotoshi) tol+=5+E*0.25;
+function tolOf(E,T,use={}){
+  const t=T*(use.hasami?0.6:1);
+  if(t>E*1.05) return -1;
+  let tol=(E-t)/2+Math.min(t*0.15,0.6);
+  if(use.itotoshi) tol+=5+E*0.25;
   return tol;
 }
+function effThread(){return curThread().T*(G.use.hasami?0.6:1)}
+function tolerance(){return tolOf(curNeedle().E,curThread().T,G.use)}
+function visUse(){return (G.st==='aim'||G.st==='retract')?G.armed:G.use}   // tools shown on screen: armed while aiming, in use while flying
 
 /* ---------- flow ---------- */
 function show(id){['title','stages','shop','result','ad'].forEach(s=>$(s).hidden=(s!==id)); $('hud').hidden=(G.mode!=='play'||id!==null&&id!=='result'&&id!=='ad');}
@@ -492,7 +509,7 @@ function startStage(n){
   G.tipY=0; G.baseX=0; makeStreaks();
   show(null); updateHud();
   const c=G.cfg;
-  if(c.k===0||!S.seenCh[c.i]||(DBG.on&&DBG.intro)){showIntro(); S.seenCh[c.i]=1; save();}
+  if(!S.seenCh[c.i]||(DBG.on&&DBG.intro)){showIntro(); S.seenCh[c.i]=1; save();}
   else toast(`ステージ${n}`,c.ch.name,1.2);
   $('hint').hidden=false;
 }
@@ -506,7 +523,7 @@ function updateHud(){
   if(c.wind){hw.innerHTML=`風 <span class="arr">${(c.wind>0?'➤':'◀').repeat(wl)}</span> ${['弱い','ふつう','強い','暴風'][wl-1]}`; hw.style.setProperty('--gx',(c.wind>0?5:-5)+'px');}
   const tries=(S.tries[c.n]||0)+1; $('hudTries').textContent=`挑戦 ${tries}回目`;
   const nd=curNeedle(), th=curThread();
-  $('hudGear').innerHTML=`${nd.name} × ${th.name}`+(isCompat()?'　<b>相性◎</b>':'')+(th.T>nd.E*1.05?'　<b>太すぎ…？</b>':'');
+  $('hudGear').innerHTML=`${pdot(nd.id)}${nd.name} × ${pdot(th.id)}${th.name}`+(isCompat()?`　<b style="color:${PAIR[th.id]}">相性◎</b>`:'')+(th.T>nd.E*1.05?'　<b>太すぎ…？</b>':'');
   ['itotoshi','hasami'].forEach(k=>{
     const cap=k[0].toUpperCase()+k.slice(1);
     $('n'+cap).textContent=S.tools[k]||0;
@@ -659,7 +676,8 @@ function update(dt){
     if(G.rt>=0.34){G.st='aim'; G.tipX=G.aimX; G.passed=false; if(G.mode==='play') updateHud();}
   }
   G.baseX+=(G.tipX-G.baseX)*clamp(dt*2.5,0,1);
-  G.flash=Math.max(0,G.flash-dt*3.5); G.fanA+=dt*(4+Math.abs(c.wind)*0.5)*Math.sign(c.wind||1);
+  G.flash=Math.max(0,G.flash-dt*3.5);
+  for(const p of G.snips){p.t+=dt; p.vy+=500*dt; p.y+=p.vy*dt; p.x+=p.vx*dt; p.r+=dt*6;} G.snips=G.snips.filter(p=>p.t<1.2); G.fanA+=dt*(4+Math.abs(c.wind)*0.5)*Math.sign(c.wind||1);
 
   // confetti & floats (real time)
   for(const p of G.confetti){p.vy+=1100*dt; p.vx*=Math.exp(-dt*1.6); p.vy*=Math.exp(-dt*1.2); p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.vr*dt; p.life-=dt;}
@@ -704,7 +722,8 @@ function drawThread(s,layer,ny){
   if(layer==='back'&&!throughEye) return;
   ctx.save();
   if(throughEye){ctx.beginPath(); if(layer==='back') ctx.rect(-1e5,-1e5,2e5,1e5+ny); else ctx.rect(-1e5,ny,2e5,1e5); ctx.clip();}
-  const th=curThread(), T=effThread(), nd=curNeedle();
+  const th=curThread(), T=th.T, nd=curNeedle();
+  const thin=!!visUse().hasami&&G.st!=='fail', Tt=T*0.6, cut=Math.min(36,Math.max(T*4,24));
   const tipX=G.tipX, tipY=G.tipY;
   const baseY=tipY+Math.max(700,H/s*1.3);
   const w=G.cfg.wind||0, bow=w*1.4*(1+0.18*Math.sin(G.tw*9));   // wind bends the hanging thread
@@ -713,7 +732,8 @@ function drawThread(s,layer,ny){
   const straight=G.st==='pass'?(G.res.np.y+nd.h+30-tipY):Math.max(42,110/s);
   const sy=tipY+Math.max(42,straight);
   ctx.lineCap='round'; ctx.lineJoin='round';
-  const path=()=>{ctx.beginPath(); ctx.moveTo(px,py);
+  const path=()=>{ctx.beginPath();
+    if(thin) ctx.moveTo(tipX,tipY+cut); else ctx.moveTo(px,py);
     if(G.st==='fail') ctx.quadraticCurveTo(tipX,tipY+T*0.4,tipX,tipY+T*3);
     ctx.lineTo(tipX,sy); ctx.bezierCurveTo(tipX+bow*0.5,sy+(baseY-sy)*0.35,G.baseX+bow,sy+(baseY-sy)*0.6,G.baseX+bow*0.6,baseY);};
   const lw=Math.max(T,1.3/s)*(layer==='back'?0.82:1);
@@ -726,6 +746,12 @@ function drawThread(s,layer,ny){
   if(T*s>5&&!th.id.startsWith('teg')){
     ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=Math.max(0.6/s,T*0.12);
     for(let yy=tipY+T*1.5; yy<sy; yy+=T*1.3){ctx.beginPath(); ctx.moveTo(tipX-T/2,yy); ctx.lineTo(tipX+T/2,yy-T*0.5); ctx.stroke();}
+  }
+  if(thin){ // the cut end: narrower, with a slanted tip
+    const tw=Math.max(Tt,1.2/s)*(layer==='back'?0.82:1);
+    ctx.fillStyle=th.color;
+    ctx.beginPath(); ctx.moveTo(tipX-lw/2,tipY+cut+lw*0.4); ctx.lineTo(tipX+lw/2,tipY+cut+lw*0.4); ctx.lineTo(tipX+tw/2,tipY+cut-lw*0.6); ctx.lineTo(tipX-tw/2,tipY+cut-lw*0.6); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tipX-tw/2,tipY+cut-lw*0.5); ctx.lineTo(tipX+tw/2,tipY+cut-lw*0.5); ctx.lineTo(tipX+tw/2,tipY); ctx.lineTo(tipX-tw/2,tipY+tw*1.2); ctx.fill();
   }
   if(layer==='back'){path(); ctx.strokeStyle='rgba(5,8,16,.38)'; ctx.lineWidth=lw; ctx.stroke();}  // farther away = darker
   ctx.restore();
@@ -743,9 +769,14 @@ function draw(){
   const cam=camera(), nd=curNeedle();
   ctx.save();
   ctx.translate(W/2,H/2); ctx.scale(cam.s,cam.s); ctx.translate(-cam.cx,-cam.cy);
+  const tu=visUse(), thr=tu.itotoshi&&!(G.st==='pass'&&G.rt>0.6);
+  const pull=G.st==='pass'?1-smooth(0.05,0.45,G.rt):1;
+  if(thr) drawThreaderBack(cam.np,nd,cam.s);
   drawThread(cam.s,'back',cam.np.y);
   drawNeedle(cam.np.x,cam.np.y,nd);
   drawThread(cam.s,'front',cam.np.y);
+  if(thr) drawThreaderLoop(cam.np,nd,cam.s,tolOf(nd.E,curThread().T,tu)*pull);
+  for(const p of G.snips){ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=curThread().color; const T0=curThread().T; ctx.fillRect(-T0/2,-6,T0,12); ctx.restore();}
   ctx.restore();
 
   drawHand(cam,c);
@@ -1213,6 +1244,24 @@ function drawDebug(cam,c){
   ctx.restore();
 }
 
+/* the wire threader: aluminium handle above the needle, a wire diamond through the eye.
+   The diamond's widest point is exactly the hit width while it is in use. */
+function drawThreaderBack(np,nd,s){
+  const hy=np.y-nd.h/2-15;
+  ctx.strokeStyle='#cfd5de'; ctx.lineWidth=Math.max(1.1,1.2/s); ctx.beginPath(); ctx.moveTo(np.x,hy+6); ctx.lineTo(np.x,np.y); ctx.stroke();
+  const g=ctx.createRadialGradient(np.x-4,hy-4,1,np.x,hy,13); g.addColorStop(0,'#f4f6fa'); g.addColorStop(1,'#8d96a5');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(np.x,hy,12,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(60,70,85,.5)'; ctx.lineWidth=Math.max(0.8,0.8/s); ctx.beginPath(); ctx.arc(np.x,hy,8,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(np.x-1,hy-1.5,3,0,Math.PI*2); ctx.stroke();
+}
+function drawThreaderLoop(np,nd,s,half){
+  if(half<=0.3) return;
+  const L=half*2.6;
+  ctx.strokeStyle='#e3e8ef'; ctx.lineWidth=Math.max(1.1,1.4/s); ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(np.x,np.y); ctx.lineTo(np.x-half,np.y+L*0.5); ctx.lineTo(np.x,np.y+L); ctx.lineTo(np.x+half,np.y+L*0.5); ctx.closePath(); ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=Math.max(0.5,0.5/s); ctx.stroke();
+}
+
 /* ---------- loop ---------- */
 let last=performance.now();
 function frame(now){
@@ -1233,7 +1282,16 @@ for(const k of ['itotoshi','hasami']){
   const cap=k[0].toUpperCase()+k.slice(1);
   $('t'+cap).onclick=()=>{
     if((S.tools[k]||0)<=0){toast('持っていません','お裁縫箱で買えます',1.4); return;}
-    G.armed[k]=!G.armed[k]; SFX.tap(); updateHud();
+    G.armed[k]=!G.armed[k];
+    const E=curNeedle().E, T=curThread().T, t0=tolOf(E,T,{...G.armed,[k]:false}), t1=tolOf(E,T,G.armed);
+    const eff= t1<0?'でも、まだ穴より太くて入らない': t0<0?'これで穴に入るようになった！':`当たりの幅が ${(t1/t0).toFixed(1)}倍 になった`;
+    if(!G.armed[k]){SFX.tap(); toast('使うのをやめました','',0.9);}
+    else if(k==='hasami'){
+      SFX.snip(); floatText('チョキン！',W*0.5,H*0.7,'#ece6d6',26);
+      G.snips.push({x:G.tipX+4,y:G.tipY+2,vx:30,vy:-60,r:0.4,t:0});
+      toast('チョキン！',`糸の先を斜めに切って細くした。${eff}`,2.4);
+    }else{SFX.tap(); toast('糸通しをセット',`針の下のひし形の輪に糸が入ればOK。${eff}`,2.4);}
+    updateHud();
   };
 }
 $('inStart').onclick=()=>{SFX.tap(); $('intro').hidden=true;};
@@ -1282,42 +1340,55 @@ $('stBack').onclick=()=>{SFX.tap(); show('title');};
 /* shop */
 let shopTab='needle', shopFrom='title';
 function openShop(from){shopFrom=from; renderShop(); show('shop');}
-$('shBack').onclick=()=>{SFX.tap(); shopFrom==='stages'?openStages():show('title');};
+$('shBack').onclick=()=>{SFX.tap(); if(shopFrom==='stages') openStages(); else if(shopFrom==='play'){show(null); updateHud();} else show('title');};
+$('tShop').onclick=()=>{SFX.tap(); openShop('play');};
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{shopTab=t.dataset.tab; SFX.tap(); renderShop();});
 function dots(v,max){let s='<span class="dots">'; for(let i=1;i<=max;i++) s+=`<i class="${i<=v?'on':''}"></i>`; return s+'</span>';}
+function easeTag(t1,t0){
+  if(t1<0) return '<span class="ez bad">今の組み合わせだと入らない</span>';
+  if(t0<0) return '<span class="ez good">これなら入るようになる</span>';
+  const r=t1/t0; if(Math.abs(r-1)<0.05) return '<span class="ez">今と同じ</span>';
+  return r>1?`<span class="ez good">今より ${r.toFixed(1)}倍 入りやすい</span>`:`<span class="ez bad">今より むずかしい（${r.toFixed(1)}倍）</span>`;
+}
 function renderShop(){
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.tab===shopTab?'true':'false'));
   const box=$('items'); let html='';
-  const card=(inner)=>`<div class="patch item">${inner}</div>`;
+  const cn=curNeedle(), ct=curThread(), t0=tolOf(cn.E,ct.T);
+  const mm=t=>t<0?'入らない':`±${(t*MM_PER_U).toFixed(2)}mm`;
   if(shopTab==='needle'||shopTab==='thread'){
+    html+=`<div class="patch combo"><div class="nm">いまの組み合わせ</div><canvas class="pv" data-pv="combo"></canvas>
+      <div class="ds">${pdot(cn.id)}${cn.name} × ${pdot(ct.id)}${ct.name}　当たりの幅 ${mm(t0)}${isCompat()?`　<b style="color:${PAIR[ct.id]}">相性◎</b>`:''}</div></div>`;
     const list=shopTab==='needle'?NEEDLES:THREADS, key=shopTab;
-    list.forEach((it,i)=>{
-      const eq=S.eq[key]===it.id, own=owns(it);
-      const lvl=key==='needle'? i+1 : i+1; // larger index = easier
+    list.forEach(it=>{
+      const eq=S.eq[key]===it.id, own=owns(it), mate=partnerOf(key,it.id);
+      const t1= key==='needle'? tolOf(it.E,ct.T) : tolOf(cn.E,it.T);
       const btn= eq?`<button class="btn sub sm" disabled>使用中</button>`
         : own?`<button class="btn sub sm" data-eq="${key}:${it.id}">使う</button>`
-        : `<button class="btn gold sm" data-buy="${key}:${it.id}" ${S.coins<it.price?'disabled':''}><span class="coin" style="color:inherit">${it.price}</span></button>`;
-      const pair=Object.entries(COMPAT).find(([k])=>k.split('|')[key==='needle'?1:0]===it.id);
-      const pairTxt=pair? `相性◎：${key==='needle'?THREADS.find(t=>t.id===pair[0].split('|')[0]).name:pair[1]}`:'';
-      html+=card(`<div><div class="nm">${it.name}${it.hard?'<span class="tag hard">むずかしい</span>':''}${it.id===(key==='needle'?'meriken':'tenui')?'<span class="tag">初期装備</span>':''}</div>
-        <div class="meter">${key==='needle'?'穴の大きさ':'糸の細さ'} ${dots(lvl,list.length)}</div></div>${btn}
-        <div class="ds">${it.desc}${pairTxt?`<br><b style="color:var(--kin)">${pairTxt}</b>（成功時 +${REWARD.compat}コイン）`:''}</div>`);
+        : `<button class="btn gold sm" data-buy="${key}:${it.id}" ${S.coins<it.price?'disabled':''}><span class="coin" style="color:inherit">${it.price.toLocaleString()}</span></button>`;
+      const tags=(it.hard?'<span class="tag hard">むずかしい</span>':'')+(it.id===(key==='needle'?'meriken':'tenui')?'<span class="tag">初期装備</span>':'');
+      html+=`<div class="patch item${mate?' has-pair':''}" style="--pair:${PAIR[it.id]||'transparent'}">
+        <div><div class="nm">${pdot(it.id)}${it.name}${tags}</div><div class="meter">${eq?'<span class="ez">使用中</span>':easeTag(t1,t0)}</div></div>${btn}
+        <canvas class="pv" data-pv="${key}:${it.id}"></canvas>
+        <div class="ds">${it.desc}${mate?`<span class="pairline" style="color:${PAIR[it.id]}"><i style="background:${PAIR[it.id]}"></i>同じ色の${key==='needle'?'糸':'針'}と相性◎：${mate.name}（成功時 +${REWARD.compat}コイン）</span>`:''}</div></div>`;
     });
   }else if(shopTab==='tool'){
     TOOLS.forEach(it=>{
-      html+=card(`<div><div class="nm">${it.name}</div><div class="meter">持っている数：${S.tools[it.id]||0}</div></div>
+      const t1=tolOf(cn.E,ct.T,{[it.id]:true});
+      html+=`<div class="patch item"><div><div class="nm">${it.name}</div><div class="meter">持っている数：${S.tools[it.id]||0}　${easeTag(t1,t0).replace('今より','今の装備で')}</div></div>
         <button class="btn gold sm" data-tool="${it.id}" ${S.coins<it.price?'disabled':''}><span class="coin" style="color:inherit">${it.price}</span></button>
-        <div class="ds">${it.desc}<br>使うと王冠（素手クリア）はもらえません。</div>`);
+        <canvas class="pv" data-pv="tool:${it.id}"></canvas>
+        <div class="ds">${it.desc}<br>ゲーム画面の下のボタンで、次の1回に使います。使うと王冠（素手クリア）はもらえません。</div></div>`;
     });
   }else{
-    html+=card(`<div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${REWARD.ad}コイン</div></div>
-      <button class="btn gold sm" id="shopAd">見る</button><div class="ds">試作版ではダミーの画面が5秒出ます。</div>`);
+    html+=`<div class="patch item"><div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${REWARD.ad}コイン</div></div>
+      <button class="btn gold sm" id="shopAd">見る</button><div class="ds">試作版ではダミーの画面が5秒出ます。</div></div>`;
     [['ひとつかみ',500,'120円'],['お裁縫箱いっぱい',1800,'370円'],['呉服屋さん',5500,'980円']].forEach(([n,c,p])=>{
-      html+=card(`<div><div class="nm">${n}</div><div class="meter"><span class="coin">${c.toLocaleString()}</span></div></div>
-        <button class="btn sub sm" disabled>${p}</button><div class="ds">アプリ版で購入できるようになります。</div>`);
+      html+=`<div class="patch item"><div><div class="nm">${n}</div><div class="meter"><span class="coin">${c.toLocaleString()}</span></div></div>
+        <button class="btn sub sm" disabled>${p}</button><div class="ds">アプリ版で購入できるようになります。</div></div>`;
     });
   }
   box.innerHTML=html;
+  box.querySelectorAll('canvas.pv').forEach(drawPreview);
   box.querySelectorAll('[data-eq]').forEach(b=>b.onclick=()=>{const [k,id]=b.dataset.eq.split(':'); S.eq[k]=id; save(); SFX.tap(); renderShop();});
   box.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const [k,id]=b.dataset.buy.split(':'); const it=(k==='needle'?NEEDLES:THREADS).find(x=>x.id===id);
     if(S.coins<it.price) return; S.coins-=it.price; S.owned[id]=1; S.eq[k]=id; save(); SFX.coin(); refreshCoins(); renderShop(); toast('買いました！',it.name,1.2);});
@@ -1325,6 +1396,84 @@ function renderShop(){
     if(S.coins<it.price) return; S.coins-=it.price; S.tools[it.id]=(S.tools[it.id]||0)+1; save(); SFX.coin(); refreshCoins(); renderShop();});
   const sa=$('shopAd'); if(sa) sa.onclick=()=>playAd(()=>renderShop());
   refreshCoins();
+}
+
+/* ---------- shop previews: the item itself on the left, a close-up of the eye with the thread on the right ---------- */
+function drawPreview(cv){
+  const spec=cv.dataset.pv, w=cv.clientWidth||300, h=84, d=Math.min(window.devicePixelRatio||1,2.5);
+  cv.width=Math.round(w*d); cv.height=Math.round(h*d);
+  const g=cv.getContext('2d'); g.setTransform(d,0,0,d,0,0);
+  let nd=curNeedle(), th=curThread(), use={}, art=null;
+  if(spec!=='combo'){const [k,id]=spec.split(':');
+    if(k==='needle'){nd=NEEDLES.find(x=>x.id===id); art=['needle',nd];}
+    else if(k==='thread'){th=THREADS.find(x=>x.id===id); art=['thread',th];}
+    else {use={[id]:true}; art=['tool',id];}}
+  const split=art?Math.round(w*0.42):0;
+  if(art){g.save(); g.translate(split/2,h/2); drawArt(g,art,split); g.restore();
+    g.strokeStyle='rgba(236,230,214,.15)'; g.setLineDash([3,4]); g.lineWidth=1; g.beginPath(); g.moveTo(split,10); g.lineTo(split,h-10); g.stroke(); g.setLineDash([]);}
+  drawCloseup(g,split,w,h,nd,th,use);
+}
+function drawCloseup(g,x0,x1,h,nd,th,use){
+  const k=2.8, cx=x0+(x1-x0)*0.42, cy=h*0.46;
+  const E=nd.E*k, hh=Math.min(nd.h*k*0.8,36), hi=hh*0.42, T=th.T*k, Tt=use.hasami?T*0.6:T;
+  const tol=tolOf(nd.E,th.T,use), fits=tol>=0;
+  g.save(); g.beginPath(); g.rect(x0,0,x1-x0,h); g.clip();
+  g.lineCap='butt';
+  if(fits){g.fillStyle=th.color; g.fillRect(cx-Tt/2,0,Tt,cy);}                       // behind the needle
+  const xl=cx-E/2-hh*0.7;
+  g.beginPath(); g.moveTo(xl+hh/2,cy-hh/2); g.lineTo(x1+20,cy-hh/2); g.lineTo(x1+20,cy+hh/2); g.lineTo(xl+hh/2,cy+hh/2); g.arc(xl+hh/2,cy,hh/2,Math.PI/2,Math.PI*1.5); g.closePath();
+  const hr=hi/2; g.moveTo(cx-E/2+hr,cy-hr); g.lineTo(cx+E/2-hr,cy-hr); g.arc(cx+E/2-hr,cy,hr,-Math.PI/2,Math.PI/2); g.lineTo(cx-E/2+hr,cy+hr); g.arc(cx-E/2+hr,cy,hr,Math.PI/2,Math.PI*1.5); g.closePath();
+  const ng=g.createLinearGradient(0,cy-hh/2,0,cy+hh/2); ng.addColorStop(0,'#5d6676'); ng.addColorStop(0.3,'#f6f8fb'); ng.addColorStop(0.55,'#b9c1cd'); ng.addColorStop(1,'#4c5463');
+  g.fillStyle=ng; g.fill('evenodd');
+  // the thread in front, coming up from below
+  const top=fits?cy:cy+hh/2+3;
+  g.fillStyle=th.color;
+  if(use.hasami){g.fillRect(cx-T/2,top+14,T,h-top-14); g.beginPath(); g.moveTo(cx-Tt/2,top+14); g.lineTo(cx+Tt/2,top+14); g.lineTo(cx+Tt/2,top); g.lineTo(cx-Tt/2,top+Tt); g.fill();}
+  else g.fillRect(cx-T/2,top,T,h-top);
+  if(th.fuzz){g.fillStyle='rgba(236,220,184,.3)'; g.fillRect(cx-T*0.65,top,T*1.3,h-top);}
+  if(use.itotoshi&&fits){const half=tol*k, L=Math.min(half*2.2,h-cy-4); g.strokeStyle='#e3e8ef'; g.lineWidth=1.6; g.beginPath(); g.moveTo(cx,cy); g.lineTo(cx-half,cy+L*0.5); g.lineTo(cx,cy+L); g.lineTo(cx+half,cy+L*0.5); g.closePath(); g.stroke();}
+  g.restore();
+  g.font='700 11px "Zen Maru Gothic",system-ui,sans-serif'; g.textAlign='right';
+  g.fillStyle=fits?'rgba(236,230,214,.75)':'#ff9a90';
+  g.fillText(fits?`当たりの幅 ±${(tol*MM_PER_U).toFixed(2)}mm`:'太すぎて入らない',x1-8,h-8);
+}
+function drawArt(g,[type,it],aw){
+  const sil=(y0,y1)=>{const gr=g.createLinearGradient(0,y0,0,y1); gr.addColorStop(0,'#6b7483'); gr.addColorStop(0.35,'#f4f6fa'); gr.addColorStop(1,'#59616f'); return gr;};
+  if(type==='needle'){
+    const L=aw*0.8, t=Math.max(3,it.h*0.42), e=Math.max(5,it.E*1.2), x0=-L/2;
+    g.fillStyle=sil(-t/2,t/2); g.beginPath(); g.moveTo(x0+t/2,-t/2); g.lineTo(L/2-20,-t*0.4); g.lineTo(L/2,0); g.lineTo(L/2-20,t*0.4); g.lineTo(x0+t/2,t/2); g.arc(x0+t/2,0,t/2,Math.PI/2,Math.PI*1.5); g.closePath();
+    const ex=x0+t*0.8, eh=Math.max(1.4,t*0.4); g.rect(ex,-eh/2,e,eh); g.fill('evenodd');
+    if(PAIR[it.id]){g.fillStyle=PAIR[it.id]; g.beginPath(); g.arc(L/2-6,-t/2-10,4,0,Math.PI*2); g.fill();}
+    return;
+  }
+  if(type==='tool'){
+    if(it==='itotoshi'){const gr=g.createRadialGradient(-30,-4,2,-26,0,17); gr.addColorStop(0,'#f4f6fa'); gr.addColorStop(1,'#8d96a5');
+      g.fillStyle=gr; g.beginPath(); g.arc(-26,0,16,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(60,70,85,.5)'; g.lineWidth=1.2; g.beginPath(); g.arc(-26,0,11,0,Math.PI*2); g.stroke();
+      g.strokeStyle='#e3e8ef'; g.lineWidth=1.6; g.beginPath(); g.moveTo(-10,0); g.lineTo(20,-14); g.lineTo(50,0); g.lineTo(20,14); g.closePath(); g.stroke();}
+    else{g.strokeStyle='#c9ced6'; g.lineWidth=6; g.lineCap='round'; g.beginPath(); g.arc(-32,0,13,Math.PI*0.5,Math.PI*1.5); g.stroke();
+      g.fillStyle=sil(-14,14); g.beginPath(); g.moveTo(-32,-13); g.lineTo(44,-3); g.lineTo(44,0); g.lineTo(-20,-4); g.fill(); g.beginPath(); g.moveTo(-32,13); g.lineTo(44,3); g.lineTo(44,0); g.lineTo(-20,4); g.fill();}
+    return;
+  }
+  const c=it.color;
+  switch(it.id){
+    case 'keito': g.fillStyle=c; g.beginPath(); g.arc(0,0,28,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(120,90,50,.35)'; g.lineWidth=2;
+      for(let i=0;i<6;i++){g.beginPath(); g.ellipse(0,0,27,8+i*4,0.5+i*0.35,0,Math.PI*2); g.stroke();} break;
+    case 'tako': g.fillStyle=c; g.beginPath(); g.ellipse(0,0,30,22,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(90,70,40,.4)'; g.lineWidth=1.5;
+      for(let i=-4;i<=4;i++){g.beginPath(); g.moveTo(i*7-10,-20); g.lineTo(i*7+10,20); g.stroke();} break;
+    case 'shishuito': g.fillStyle=c; g.beginPath(); g.ellipse(0,0,40,12,0,0,Math.PI*2); g.fill(); g.strokeStyle='rgba(0,0,0,.15)'; g.lineWidth=1.5;
+      for(let i=-6;i<=6;i++){g.beginPath(); g.moveTo(i*6-4,-10); g.lineTo(i*6+4,10); g.stroke();}
+      g.fillStyle='#f3efe4'; g.fillRect(-26,-13,10,26); g.fillRect(14,-13,10,26); break;
+    case 'tenui': case 'kinu': { const big=it.id==='tenui'; g.fillStyle='#b48a5e'; g.fillRect(-24,-24,48,7); g.fillRect(-24,17,48,7);
+      g.fillStyle=c; g.fillRect(-18,-17,36,34); g.strokeStyle='rgba(0,0,0,.12)'; g.lineWidth=1; for(let y=-14;y<17;y+=3){g.beginPath(); g.moveTo(-18,y); g.lineTo(18,y); g.stroke();}
+      if(!big){g.fillStyle='rgba(255,255,255,.35)'; g.fillRect(-10,-17,5,34);} break;}
+    case 'mishin': g.fillStyle=c; g.beginPath(); g.moveTo(-10,-28); g.lineTo(10,-28); g.lineTo(22,22); g.lineTo(-22,22); g.fill();
+      g.strokeStyle='rgba(0,0,0,.1)'; for(let y=-24;y<22;y+=3){const hw=10+(y+28)*0.24; g.beginPath(); g.moveTo(-hw,y); g.lineTo(hw,y); g.stroke();}
+      g.fillStyle='#b48a5e'; g.fillRect(-25,22,50,6); break;
+    case 'tegusu': g.fillStyle='rgba(124,196,242,.25)'; g.beginPath(); g.arc(0,0,28,0,Math.PI*2); g.fill();
+      g.strokeStyle='rgba(214,236,255,.7)'; g.lineWidth=1; for(let r=12;r<26;r+=2.5){g.beginPath(); g.arc(0,0,r,0,Math.PI*2); g.stroke();}
+      g.fillStyle='rgba(124,196,242,.7)'; g.beginPath(); g.arc(0,0,8,0,Math.PI*2); g.fill(); break;
+  }
+  if(PAIR[it.id]){g.fillStyle=PAIR[it.id]; g.beginPath(); g.arc(38,-24,4,0,Math.PI*2); g.fill();}
 }
 
 /* result buttons */
