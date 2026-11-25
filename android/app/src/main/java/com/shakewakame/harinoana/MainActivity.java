@@ -1,4 +1,4 @@
-package com.harinoana.challenge;
+package com.shakewakame.harinoana;
 
 import com.getcapacitor.BridgeActivity;
 

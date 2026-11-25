@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">針の穴チャレンジ</string>
     <string name="title_activity_main">針の穴チャレンジ</string>
-    <string name="package_name">com.harinoana.challenge</string>
-    <string name="custom_url_scheme">com.harinoana.challenge</string>
+    <string name="package_name">com.shakewakame.harinoana</string>
+    <string name="custom_url_scheme">com.shakewakame.harinoana</string>
 </resources>
