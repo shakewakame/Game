@@ -27,9 +27,7 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Build the game page and sync it into the Android project
-        env:
-          HARI_AD_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+      - name: Build the game page and sync it into the Android project (test ads)
         run: |
           npm run build
           npx cap sync android
@@ -37,7 +35,6 @@ jobs:
       - name: Build test APK (install this on your phone)
         working-directory: android
         env:
-          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
           VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew --no-daemon assembleDebug
 
@@ -54,9 +51,11 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
           VERSION_CODE: ${{ github.run_number }}
+          # real AdMob rewarded unit, used only in the store bundle
+          HARI_AD_REWARDED_ID: ca-app-pub-9361218965649203/8785551924
         run: |
+          (cd .. && npm run build && npx cap copy android)
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           KEYSTORE_FILE="$RUNNER_TEMP/upload.jks" ./gradlew --no-daemon bundleRelease
 

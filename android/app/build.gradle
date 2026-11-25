@@ -9,7 +9,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode((System.getenv("VERSION_CODE") ?: "1") as int)
         versionName System.getenv("VERSION_NAME") ?: "1.0.0"
-        manifestPlaceholders = [admobAppId: System.getenv("ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713"]
+        // AdMob app IDs: Google's public test ID for debug builds, the real one only in the store build
+        manifestPlaceholders = [admobAppId: "ca-app-pub-3940256099942544~3347511713"]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -30,6 +31,7 @@ android {
     }
     buildTypes {
         release {
+            manifestPlaceholders = [admobAppId: "ca-app-pub-9361218965649203~2443825650"]
             if (System.getenv("KEYSTORE_FILE")) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
