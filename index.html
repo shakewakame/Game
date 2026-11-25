@@ -416,7 +416,7 @@ function stageCfg(n){
     }
   }
   // two needles: the near one (A) sits halfway and slides into line with the far one (B), rests there, then slides away
-  if(v.twin){const DA=Math.round(c.D*0.5); const ft=flyTimes(c.D,DA); c.twin={DA,P:4.4,rest:1.7,S:c.A*0.9+20,lead:c.wind*(ft.tB-ft.tA)};}
+  if(v.twin){const DA=Math.round(c.D-Math.min(c.D*0.5,600)); const ft=flyTimes(c.D,DA); c.twin={DA,P:5.4,rest:3.2,S:c.A*0.9+20,lead:c.wind*(ft.tB-ft.tA)};}
   const T=(c.wind||c.cat)?flyTime(c.D,c.twin&&c.twin.DA):0;
   // wind: place the needle so that the right aim is inside the thread's swing (aim = needle − drift)
   if(c.wind) c.offX=c.wind*T+[0.3,-0.25,0.15,-0.35][n%4]*c.A;
@@ -677,10 +677,18 @@ function update(dt){
     const first=c.twin&&!G.passedA, tgt=first?needleAPos(G.tw):np;
     const r=G.tipY-tgt.y, leg=first?c.twin.DA:(c.twin?c.D-c.twin.DA:c.D);
     const zone=Math.max(110,Math.min(leg*0.55,520));
-    G.camK+=(smooth(zone,20,r)-G.camK)*clamp(dt*8,0,1);
-    G.sm=smooth(SLOW.start,SLOW.end,r); G.ts=1-SLOW.depth*G.sm;
+    let camT=smooth(zone,20,r);
+    if(c.twin&&G.passedA){   // between the needles: stay close, ease out a little on long gaps, then settle on the far eye
+      const pr=clamp((-c.twin.DA-G.tipY)/(c.twin.DA-c.D+1e-6)*-1,0,1), dip=clamp((c.D-c.twin.DA)/3000,0.15,0.55);
+      camT=Math.max(camT,1-dip*Math.sin(Math.PI*pr));
+    }
+    G.camK+=(camT-G.camK)*clamp(dt*(c.twin&&G.passedA?4:8),0,1);
+    const smT=smooth(SLOW.start,SLOW.end,r);
+    G.sm=(c.twin&&G.passedA)?Math.max(smT,G.sm-dt*1.4):smT;   // ease out of the first slow-motion instead of snapping
+    G.ts=1-SLOW.depth*G.sm;
     G.drift+=c.wind*dtw;
-    const vEff=Math.min(G.v,SLOW.vmin+Math.max(r,0)*SLOW.vk);
+    let vEff=Math.min(G.v,SLOW.vmin+Math.max(r,0)*SLOW.vk);
+    if(c.twin&&G.passedA){G.vNow=Math.min(vEff,650,G.vNow+Math.max(400,G.v*1.2)*dtw); vEff=G.vNow;}   // pick up speed gradually after the first needle
     G.tipY-=vEff*dtw;
     G.tipX=G.flyX+G.drift+trem(G.tw);
     if(catPunch(G.tw)>0.5){   // the cat bats the flying thread away
@@ -690,7 +698,7 @@ function update(dt){
     else if(G.tipY<=tgt.y){
       if(first){   // through the near needle? keep going to the far one
         const dx=G.tipX-tgt.x, tol=tolerance();
-        if((DBG.on&&DBG.always&&!G.demo)||(tol>=0&&Math.abs(dx)<=tol+0.15)){G.passedA=true; G.ax=tgt.x; if(!G.demo){SFX.slip(); floatText('1本目！',W*0.5,H*0.36,'#ece6d6',28);}}
+        if((DBG.on&&DBG.always&&!G.demo)||(tol>=0&&Math.abs(dx)<=tol+0.15)){G.passedA=true; G.ax=tgt.x; G.vNow=SLOW.vmin*0.5; if(!G.demo){SFX.slip(); floatText('1本目！',W*0.5,H*0.36,'#ece6d6',28);}}
         else {resolve(tgt); G.res.atA=true;}
       } else resolve(np);
     }
@@ -749,7 +757,11 @@ function retract(){if(G.st!=='pass'){G.passed=false; G.passedA=false;} G.st='ret
 function camera(){
   const c=G.cfg, nd=curNeedle(), nb=needlePos(G.tw);
   const onA=c.twin&&!G.passedA&&(G.st==='aim'||G.st==='fly'||((G.st==='fail'||G.st==='whiff')&&G.res&&G.res.atA));
-  const np=onA?needleAPos(G.tw):nb;
+  let np=onA?needleAPos(G.tw):nb;
+  if(c.twin&&G.passedA&&G.st!=='retract'){   // glide the focus from the near eye to the far one as the thread travels
+    const ay=-c.twin.DA, pr=clamp((ay-G.tipY)/(ay-nb.y),0,1), e=pr*pr*(3-2*pr);
+    np={x:lerp(G.ax,nb.x,e),y:lerp(ay,nb.y,e)};
+  }
   const spanX=2*c.A+2*Math.abs(c.offX)+90;
   const s0=Math.min(H*0.58/(c.D+50), W*0.86/spanX, 3.4);
   const c0x=c.offX*0.5, c0y=-c.D-(H*0.24-H/2)/s0;
