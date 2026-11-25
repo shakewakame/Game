@@ -364,10 +364,13 @@ const STAGES=100;
 function windLevel(){const w=Math.abs(G.cfg.wind); return w<12?1:w<22?2:w<30?3:4;}
 const SLOW={start:85,end:9,depth:0.9,vmin:170,vk:4.5};
 // world time the thread takes to reach the needle (used to make wind stages solvable)
-function flyTimes(D,DA){let y=0,t=0,tA=0; const v=300+D*0.22, dt=1/240;
+// mirrors the flight in update(): slow-motion near each needle, and the gentle restart after the first one
+function flyTimes(D,DA){let y=0,t=0,tA=0,sm=0,vNow=0,after=false; const v=300+D*0.22, dt=1/240;
   for(const stop of (DA?[DA,D]:[D])){
-    while(y>-stop){const r=y+stop, sm=smooth(SLOW.start,SLOW.end,r), ts=1-SLOW.depth*sm; y-=Math.min(v,SLOW.vmin+Math.max(r,0)*SLOW.vk)*dt*ts; t+=dt*ts;}
-    if(stop===DA) tA=t;
+    while(y>-stop){const r=y+stop, smT=smooth(SLOW.start,SLOW.end,r); sm=after?Math.max(smT,sm-dt*1.4):smT; const ts=1-SLOW.depth*sm;
+      let ve=Math.min(v,SLOW.vmin+Math.max(r,0)*SLOW.vk); if(after){vNow=Math.min(ve,650,vNow+Math.max(400,v*1.2)*dt*ts); ve=vNow;}
+      y-=ve*dt*ts; t+=dt*ts;}
+    if(DA&&stop===DA){tA=t; after=true; vNow=SLOW.vmin*0.5;}
   }
   return {tA,tB:t};}
 function flyTime(D,DA){return flyTimes(D,DA).tB}
@@ -416,7 +419,7 @@ function stageCfg(n){
     }
   }
   // two needles: the near one (A) sits halfway and slides into line with the far one (B), rests there, then slides away
-  if(v.twin){const DA=Math.round(c.D-Math.min(c.D*0.5,600)); const ft=flyTimes(c.D,DA); c.twin={DA,P:5.4,rest:3.2,S:c.A*0.9+20,lead:c.wind*(ft.tB-ft.tA)};}
+  if(v.twin){const DA=Math.round(c.D-clamp(c.D*0.3,60,260)); const ft=flyTimes(c.D,DA); c.twin={DA,P:5.4,rest:3.2,S:c.A*0.9+20,gap:ft.tB-ft.tA,lead:c.wind*(ft.tB-ft.tA)};}
   const T=(c.wind||c.cat)?flyTime(c.D,c.twin&&c.twin.DA):0;
   // wind: place the needle so that the right aim is inside the thread's swing (aim = needle − drift)
   if(c.wind) c.offX=c.wind*T+[0.3,-0.25,0.15,-0.35][n%4]*c.A;
@@ -529,7 +532,7 @@ function tolOf(E,T,use={}){
   return tol;
 }
 function needleAPos(t){   // the near needle of a 二本抜き stage
-  const tw=G.cfg.twin, b=needlePos(t), u=mod(t,tw.P);
+  const tw=G.cfg.twin, b=needlePos(t+tw.gap), u=mod(t,tw.P);
   if(G.passedA&&G.ax!==undefined) return {x:G.ax,y:-tw.DA};   // stays put once the thread is through
   const slide=u<tw.rest?0:tw.S*Math.sin(Math.PI*(u-tw.rest)/(tw.P-tw.rest));
   return {x:b.x-tw.lead+slide, y:-tw.DA};
