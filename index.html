@@ -630,7 +630,7 @@ function showResult(){
   $('resLines').innerHTML=r.lines.map(([k,v])=>`<div><span>${k}</span><span class="coin">${v}</span></div>`).join('')+`<div class="tot"><span>合計</span><span class="coin">${r.tot}</span></div>`;
   $('resNext').hidden=c.n>=STAGES;
   $('resDouble').hidden=r.tot<=0;
-  if(r.tot<=0) $('resLines').innerHTML='<div><span>クリア済みのステージなので、コインはもらえません</span></div>'; $('resDouble').innerHTML=`広告を見て2倍にする（<span class="coin" style="color:inherit">+${r.tot}</span>）`;
+  if(r.tot<=0) $('resLines').innerHTML='<div><span>クリア済みのステージなので、コインはもらえません</span></div>'; $('resDouble').innerHTML=`広告で2倍に <span class="coin" style="color:inherit">+${r.tot}</span>`;
   G.resultShown=true; show('result'); $('hud').hidden=true;
   if(c.n>=STAGES) $('resTries').textContent+='　全100ステージ制覇！';
   else if(r.chUp) $('resTries').innerHTML+=`<br><b style="color:var(--kin)">第${c.i+1}章クリア！ 広告でもらえるコインが ${adCoins()} に</b>`;
