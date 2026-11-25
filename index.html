@@ -343,7 +343,8 @@ const MM_PER_U=0.08;
 const REWARD={fail:5, crown:15, compatX:2};
 const clearCoins=n=>20+2*n;                                    // stage 1: 22 … stage 100: 220
 const clearedCount=()=>Object.keys(S.cleared).length;
-const adCoins=()=>50+2*clearedCount();                         // ads grow with progress
+const chaptersCleared=()=>CHAPTERS.filter((_,i)=>{for(let n=i*10+1;n<=i*10+10;n++) if(!S.cleared[n]) return false; return true;}).length;
+const adCoins=()=>50+50*chaptersCleared();                    // 50, 100, 150 … +50 for every chapter cleared
 const unlocked=it=>!it.unlock||!!S.cleared[it.unlock];
 
 /* ---------- stages ---------- */
@@ -372,13 +373,13 @@ const VARIANTS=[
   {name:'基本',     desc:'この章の仕掛けに慣れよう'},
   {name:'ゆらゆら', desc:'糸が端でゆっくり、真ん中で速く動く', pattern:'sine'},
   {name:'小刻み',   desc:'糸の動く幅がせまくて速い', A:0.55, sp:1.1},
-  {name:'2連続',    desc:'2回続けて通せばクリア。失敗すると最初から', need:2, sp:0.75},
+  {name:'2本通し',  desc:'2回通せばクリア。失敗しても1本目は消えない', need:2, sp:0.85},
   {name:'気まぐれ', desc:'糸が速くなったり遅くなったりする', pattern:'jerky'},
   {name:'大振り',   desc:'糸が大きく動く', A:1.45},
   {name:'ためらい', desc:'糸がときどきピタッと止まる。止まった瞬間がチャンス？', pattern:'pause'},
   {name:'精密',     desc:'当たりの幅がせまい。そのかわりクリア報酬1.5倍', tol:0.7, sp:0.85, bonus:1.5},
   {name:'早業',     desc:'糸がとても速い', sp:1.25},
-  {name:'総仕上げ', desc:'気まぐれな糸を2回続けて通せ', pattern:'jerky', need:2, sp:0.7},
+  {name:'総仕上げ', desc:'気まぐれな糸を2回通せばクリア', pattern:'jerky', need:2, sp:0.8},
 ];
 function stageCfg(n){
   const i=Math.floor((n-1)/10), k=(n-1)%10, ch=CHAPTERS[i];
@@ -544,7 +545,7 @@ function showIntro(){
   $('inWhat').textContent=c.ch.what; $('inHow').textContent=c.ch.how; $('intro').hidden=false;
 }
 function updateHud(){
-  const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n}　${c.ch.name}・${c.v.name}`+(c.need>1?`　連続 ${G.streak}/${c.need}`:''); const wl=windLevel(); const hw=$('hudWind'); hw.hidden=!c.wind;
+  const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n}　${c.ch.name}・${c.v.name}`+(c.need>1?`　通した ${G.streak}/${c.need}`:''); const wl=windLevel(); const hw=$('hudWind'); hw.hidden=!c.wind;
   if(c.wind){hw.innerHTML=`風 <span class="arr">${(c.wind>0?'➤':'◀').repeat(wl)}</span> ${['弱い','ふつう','強い','暴風'][wl-1]}`; hw.style.setProperty('--gx',(c.wind>0?5:-5)+'px');}
   const tries=(S.tries[c.n]||0)+1; $('hudTries').textContent=`挑戦 ${tries}回目`; $('tAd').textContent=`広告を見て +${adCoins()}`;
   const nd=curNeedle(), th=curThread();
@@ -576,15 +577,15 @@ function resolve(np){
     if(!G.demo) G.streak++; G.res.final=G.demo||G.streak>=G.cfg.need;
     if(!G.demo){G.flash=1; SFX.slip();}
   }else if(sideMiss){
-    G.st='whiff'; if(!G.demo) SFX.whiff(); if(G.streak>0){G.res.broke=G.streak;} G.streak=0;
+    G.st='whiff'; if(!G.demo) SFX.whiff();
   }else{
-    G.st='fail'; G.tipY=np.y; G.bend=0; if(G.streak>0){G.res.broke=G.streak;} G.streak=0; G.bendDir=dx>=0?1:-1; if(!G.demo){SFX.boing(); vibrate(25);}
+    G.st='fail'; G.tipY=np.y; G.bend=0; G.bendDir=dx>=0?1:-1; if(!G.demo){SFX.boing(); vibrate(25);}
   }
 }
 function award(){
   const c=G.cfg, r=G.res, nd=curNeedle(), th=curThread();
   const lines=[]; let tot=0;
-  const fresh=!S.cleared[c.n];
+  const fresh=!S.cleared[c.n], chBefore=chaptersCleared();
   if(r.ok){
     if(fresh){lines.push([c.bonus>1?`クリア報酬（${c.v.name}×${c.bonus}）`:'クリア報酬',Math.round(clearCoins(c.n)*c.bonus)]); S.cleared[c.n]=1;}
     const bare=nd.E<=DEFAULT_NEEDLE.E&&th.T>=DEFAULT_THREAD.T&&!G.use.itotoshi&&!G.use.hasami;
@@ -593,7 +594,7 @@ function award(){
   }else if(fresh) lines.push(['チャレンジ参加賞',REWARD.fail]);
   lines.forEach(l=>tot+=l[1]);
   if(isCompat()&&tot>0){lines.push([`相性◎ コイン2倍（${nd.name}×${th.name}）`,tot]); tot*=REWARD.compatX;}
-  S.coins+=tot; save(); r.lines=lines; r.tot=tot;
+  S.coins+=tot; save(); r.lines=lines; r.tot=tot; r.chUp=chaptersCleared()>chBefore;
   if(tot>0){floatText(`+${tot}`,W/2,H*0.5,'#e5b54c'); SFX.coin();}
   refreshCoins();
 }
@@ -610,6 +611,7 @@ function showResult(){
   if(r.tot<=0) $('resLines').innerHTML='<div><span>クリア済みのステージなので、コインはもらえません</span></div>'; $('resDouble').innerHTML=`広告を見て2倍にする（<span class="coin" style="color:inherit">+${r.tot}</span>）`;
   G.resultShown=true; show('result'); $('hud').hidden=true;
   if(c.n>=STAGES) $('resTries').textContent+='　全100ステージ制覇！';
+  else if(r.chUp) $('resTries').innerHTML+=`<br><b style="color:var(--kin)">第${c.i+1}章クリア！ 広告でもらえるコインが ${adCoins()} に</b>`;
 }
 function toast(big,small,dur=1.4){
   const t=$('toast'); $('toastBig').textContent=big; $('toastSmall').textContent=small||''; t.style.opacity=1;
@@ -667,7 +669,7 @@ function update(dt){
     G.tipY-=vEff*dtw;
     G.tipX=G.flyX+G.drift+trem(G.tw);
     if(catPunch(G.tw)>0.5){   // the cat bats the flying thread away
-      G.res={dx:99,tol:tolerance(),ok:false,np,cat:true,broke:G.streak}; G.streak=0; G.rt=0; G.st='whiff'; G.drift-=70;
+      G.res={dx:99,tol:tolerance(),ok:false,np,cat:true}; G.rt=0; G.st='whiff'; G.drift-=70;
       if(!G.demo){SFX.boing(); vibrate(25);}
     }
     else if(G.tipY<=np.y) resolve(np);
@@ -679,7 +681,7 @@ function update(dt){
     const target=np.y-80; G.tipY=Math.max(target,G.tipY-120*dtw*(1+G.rt*3));
     G.tipX=np.x+G.relX;
     if(!G.res.final){   // a streak stage: one down, more to go
-      if(G.rt>=0.35&&!G.res.burst){G.res.burst=true; SFX.coin(); vibrate(30); toast(`${G.streak}本目！`,`あと${c.need-G.streak}回つづけて通そう`,1.3); updateHud();}
+      if(G.rt>=0.35&&!G.res.burst){G.res.burst=true; SFX.coin(); vibrate(30); toast(`${G.streak}本目！`,`あと${c.need-G.streak}本でクリア`,1.3); updateHud();}
       if(G.rt>1.2) retract();
     }else{
     if(G.rt>=0.35&&!G.res.burst){G.res.burst=true; if(!G.demo){burst(); SFX.cracker(); SFX.applause(); vibrate([30,40,60]); award();}}
@@ -698,7 +700,7 @@ function update(dt){
         if(r.cat) toast('ねこパンチ！','耳が見えたらパンチの合図。合間をねらおう',1.6);
         else if(r.tol<0) toast('太すぎて入らない！','穴より糸が太いみたい。お裁縫箱で針か糸を替えてみよう',2.4);
         else if(G.st==='whiff') toast('空振り！',`穴まであと ${Math.max(0.01,(Math.abs(r.dx)-r.tol)*MM_PER_U).toFixed(2)}mm`,1.4);
-        else{const miss=(Math.abs(r.dx)-r.tol)*MM_PER_U; toast(miss<0.25?'惜しい！':'おっと！',`あと ${Math.max(0.01,miss).toFixed(2)}mm ${r.dx>0?'左':'右'}だった`+(r.broke?`（連続が途切れた）`:''),1.4);}
+        else{const miss=(Math.abs(r.dx)-r.tol)*MM_PER_U; toast(miss<0.25?'惜しい！':'おっと！',`あと ${Math.max(0.01,miss).toFixed(2)}mm ${r.dx>0?'左':'右'}だった`,1.4);}
         award();
       }
     }
@@ -1409,7 +1411,7 @@ function renderShop(){
         <div class="ds">${it.desc}<br>ゲーム画面の下のボタンで使います。ステージを出ると効果はなくなります。使うと王冠（素手クリア）はもらえません。</div></div>`;
     });
   }else{
-    html+=`<div class="patch item"><div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${adCoins()}コイン（クリアしたステージが多いほど増える）</div></div>
+    html+=`<div class="patch item"><div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${adCoins()}コイン（章をクリアするごとに +50）</div></div>
       <button class="btn gold sm" id="shopAd">見る</button><div class="ds">試作版ではダミーの画面が5秒出ます。</div></div>`;
     [['ひとつかみ',500,'120円'],['お裁縫箱いっぱい',1800,'370円'],['呉服屋さん',5500,'980円']].forEach(([n,c,p])=>{
       html+=`<div class="patch item"><div><div class="nm">${n}</div><div class="meter"><span class="coin">${c.toLocaleString()}</span></div></div>
