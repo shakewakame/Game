@@ -143,6 +143,12 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
 #ad .box{width:min(320px,100%);aspect-ratio:9/12;border:2px dashed var(--muted);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;color:var(--muted);padding:1rem}
 #ad .cnt{font-size:2.4rem;font-weight:900;color:var(--ink);font-variant-numeric:tabular-nums}
 
+#intro{justify-content:center;background:rgba(10,14,26,.6)}
+.intro-card{display:flex;flex-direction:column;gap:.9rem;padding:1.4rem 1.2rem}
+.in-ch{font-size:.8rem;letter-spacing:.12em;color:var(--kin);font-weight:700}
+.intro-card h2{margin:0;font-family:var(--font-display);font-weight:900;font-size:clamp(1.8rem,9vw,2.4rem);text-wrap:balance}
+.in-block b{display:block;font-size:.85rem;color:var(--sashiko);margin-bottom:.2rem}
+.in-block p{margin:0;line-height:1.75;font-size:1rem}
 @media (prefers-reduced-motion:reduce){.hint,.chip.live::before{animation:none}}
 </style>
 
@@ -157,7 +163,7 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
         <span class="chip live" id="hudTries">挑戦 1回目</span>
         <span class="chip"><span class="coin" id="hudCoins">0</span></span>
       </div>
-      <div class="stage-name" id="hudStage"></div>
+      <div class="hud-row"><div class="stage-name" id="hudStage"></div><button class="chip" id="hudHelp">？ルール</button></div>
       <div class="gear" id="hudGear"></div>
       <div class="wind" id="hudWind" hidden></div>
     </div>
@@ -195,7 +201,7 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
     <div class="bar"><button class="back" id="stBack">← タイトル</button><h2>ステージ</h2><span class="coin" id="stCoins">0</span></div>
     <div id="chapters"></div>
     <button class="btn sub sm" id="stShop" style="margin-bottom:.8rem">お裁縫箱（ショップ）へ</button>
-    <p class="note">王冠は「素手クリア」の印です。初期装備（メリケン針と手縫い糸）か、それより難しい組み合わせで、道具を使わずにクリアするともらえます。</p>
+    <p class="note">各章のはじめに、その章のルール説明が出ます。王冠は「素手クリア」の印です。初期装備（メリケン針と手縫い糸）か、それより難しい組み合わせで、道具を使わずにクリアするともらえます。</p>
   </section>
 
   <!-- shop -->
@@ -226,6 +232,17 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
     </div>
   </section>
 
+  <!-- chapter intro -->
+  <section class="screen" id="intro" hidden>
+    <div class="patch intro-card">
+      <div class="in-ch" id="inCh"></div>
+      <h2 id="inName"></h2>
+      <div class="in-block"><b>なにが起きる？</b><p id="inWhat"></p></div>
+      <div class="in-block"><b>どうする？</b><p id="inHow"></p></div>
+      <button class="btn" id="inStart">はじめる</button>
+    </div>
+  </section>
+
   <!-- fake ad -->
   <section class="screen" id="ad" hidden>
     <div class="box">
@@ -246,68 +263,96 @@ const $=id=>document.getElementById(id);
 const NEEDLES=[
   {id:'beads', name:'ビーズ針', E:6,  h:8,  price:0,    hard:true, desc:'ビーズを通すための極細の針。穴はとても小さい。上級者向け。'},
   {id:'meriken',name:'メリケン針',E:10, h:12, price:0,   desc:'いちばん普通の縫い針。明治時代にアメリカ（メリケン）から伝わったのが名前の由来。'},
-  {id:'shishu',name:'刺しゅう針',E:15, h:14, price:700, desc:'何本もの糸を通すため、穴が細長く大きく作られている。'},
-  {id:'toji',  name:'毛糸とじ針',E:24, h:22, price:2500,desc:'編み物をとじる太い針。先が丸く、穴がとても大きい。'},
+  {id:'shishu',name:'刺しゅう針',E:15, h:14, price:1200, desc:'何本もの糸を通すため、穴が細長く大きく作られている。'},
+  {id:'toji',  name:'毛糸とじ針',E:24, h:22, price:6000,desc:'編み物をとじる太い針。先が丸く、穴がとても大きい。'},
 ];
 const THREADS=[
   {id:'keito', name:'毛糸（並太）',T:16, price:0,   hard:true, color:'#ecdcb8', fuzz:true, desc:'セーターを編む太い糸。普通の針にはまず入らない。毛糸とじ針なら……？'},
   {id:'tako',  name:'タコ糸',      T:9,  price:0,   hard:true, color:'#d9c49b', desc:'凧あげやチャーシューを縛る丈夫な木綿糸。'},
   {id:'shishuito',name:'刺しゅう糸（6本どり）',T:6,price:0,hard:true,color:'#e2558a',desc:'細い糸が6本より合わさった糸。刺しゅう針と相性が良い。'},
   {id:'tenui', name:'手縫い糸',    T:4,  price:0,   color:'#d2403a', desc:'ボタン付けや裾上げに使う普通の糸。'},
-  {id:'mishin',name:'ミシン糸（60番）',T:2.6,price:300,color:'#f3efe4',desc:'ミシン用の細い糸。「番手」の数字が大きいほど細くなる。'},
-  {id:'kinu',  name:'絹糸',        T:1.8,price:1200, color:'#e9c46a', sheen:true, desc:'蚕のまゆから作る、細くてつややかな糸。'},
-  {id:'tegusu',name:'テグス（0.6号）',T:1.2,price:3000,color:'rgba(214,236,255,.8)',desc:'釣り糸にも使う透明なナイロン糸。ビーズ針と相性が良い。'},
+  {id:'mishin',name:'ミシン糸（60番）',T:2.6,price:400,color:'#f3efe4',desc:'ミシン用の細い糸。「番手」の数字が大きいほど細くなる。'},
+  {id:'kinu',  name:'絹糸',        T:1.8,price:2500, color:'#e9c46a', sheen:true, desc:'蚕のまゆから作る、細くてつややかな糸。'},
+  {id:'tegusu',name:'テグス（0.6号）',T:1.2,price:9000,color:'rgba(214,236,255,.8)',desc:'釣り糸にも使う透明なナイロン糸。ビーズ針と相性が良い。'},
 ];
 const COMPAT={'keito|toji':'毛糸とじ針','shishuito|shishu':'刺しゅう針','tenui|meriken':'メリケン針','tegusu|beads':'ビーズ針'};
 const TOOLS=[
-  {id:'itotoshi',name:'糸通し',price:60,desc:'針金の輪で糸を引き込む、昔ながらの道具。1回だけ穴が大きく使える。'},
-  {id:'hasami', name:'糸切りばさみ',price:25,desc:'糸の先を斜めに切りそろえると通しやすくなる。1回だけ糸が細くなる。'},
+  {id:'itotoshi',name:'糸通し',price:80,desc:'針金の輪で糸を引き込む、昔ながらの道具。1回だけ穴が大きく使える。'},
+  {id:'hasami', name:'糸切りばさみ',price:30,desc:'糸の先を斜めに切りそろえると通しやすくなる。1回だけ糸が細くなる。'},
 ];
 const DEFAULT_NEEDLE=NEEDLES[1], DEFAULT_THREAD=THREADS[3];
 const MM_PER_U=0.08;
-// economy: one full clear earns ~4,500 coins; buying everything costs ~7,700, so ads and replays matter
-const REWARD={fail:3, compat:10, crown:20, ad:60};
-const successCoins=n=>10+n;      // stage 1: 11 … stage 30: 40
-const firstCoins=n=>20+n*4;      // stage 1: 24 … stage 30: 140
+// economy: clearing all 100 stages earns roughly 10,000 coins; every needle and thread costs 19,100,
+// so the best gear needs ads or replays
+const REWARD={fail:2, compat:10, crown:15, ad:60};
+const successCoins=n=>5+Math.floor(n/5);   // stage 1: 5 … stage 100: 25
+const firstCoins=n=>10+n;                  // stage 1: 11 … stage 100: 110
 
 /* ---------- stages ---------- */
 const CHAPTERS=[
-  {from:1, to:5, name:'ちゃぶ台', sub:'まずは落ち着いて', tip:'糸が穴の真下に来たらタップ！'},
-  {from:6, to:10,name:'ゆれる針', sub:'針が左右にゆれる', tip:'針もゆれている。動きを読もう'},
-  {from:11,to:15,name:'扇風機の前',sub:'風で糸が流される', tip:'風で糸が流される。ずらして狙おう'},
-  {from:16,to:20,name:'満員電車', sub:'ガタンと揺れる', tip:'ガタン…ゴトン…揺れのリズムを覚えよう'},
-  {from:21,to:25,name:'手がふるえる',sub:'深呼吸して', tip:'手がふるえる…落ち着いて'},
-  {from:26,to:29,name:'船の上', sub:'ぜんぶ揺れる', tip:'船の上。針も糸も揺れる'},
-  {from:30,to:30,name:'はるか彼方',sub:'最終ステージ', tip:'はるか彼方。穴は見えるか？'},
+  {id:'chabudai',name:'ちゃぶ台',sub:'まずは基本',what:'糸は左右に動き続けています。針はじっとしています。',how:'糸の先が穴の真下に来た瞬間にタップ。'},
+  {id:'park',name:'公園のブランコ',sub:'針がゆれる',what:'ブランコをこぎながら糸通し。針を持つ手ごと、左右にゆれます。',how:'糸が届くまでには少し時間がかかります。届くころに針がどこにいるかを先読みしてタップ。'},
+  {id:'fan',name:'扇風機の前',sub:'風で糸が流される',what:'扇風機の風で、進んでいく糸が風下に流されます。',how:'風上側に少しずらしてタップ。風の強さは左上に出ます。'},
+  {id:'train',name:'満員電車',sub:'ガタンと揺れる',what:'電車が一定のリズムで「ガタン」と揺れ、そのたびに針を持つ手がずれて、ゆっくり元に戻ります。',how:'「ガタン」のリズムを覚えて、揺れていない間に糸が届くように打とう。'},
+  {id:'snow',name:'雪の朝',sub:'手がかじかむ',what:'寒さで糸を持つ手がぶるぶる震え、糸の先が細かく揺れます。震えは強くなったり弱くなったりします。',how:'震えがおさまった瞬間を狙おう。'},
+  {id:'sea',name:'船の上',sub:'ぜんぶ揺れる',what:'波で針が上下左右に揺れ、潮風で糸も流されます。',how:'これまでの応用。針の動きと風を両方読もう。'},
+  {id:'night',name:'夜なべ',sub:'電灯がちらつく',what:'夜なべ仕事。古い電灯が一定のリズムでふっと暗くなります。',how:'電灯がチカチカしたら暗くなる合図。暗くなる前に打つか、暗い中でリズムを信じて打とう。'},
+  {id:'cat',name:'ねこのいる部屋',sub:'ねこパンチ',what:'ねこが糸に興味しんしん。一定のリズムで、飛んでいる糸にねこパンチしてきます。',how:'画面の右に耳が見えたらパンチの合図。パンチの合間に糸を届けよう。'},
+  {id:'space',name:'宇宙ステーション',sub:'無重力',what:'無重力で針がふわふわ漂います。左右だけでなく上下にも動きます。',how:'上下に動くと、糸が届くタイミングも変わります。よく見て先読みしよう。'},
+  {id:'far',name:'はるか彼方',sub:'最終章',what:'これまでの仕掛けが組み合わさって登場。針ははるか遠くにあります。',how:'金色の輪が穴の位置の目印。100面目、伝説の一針を通せるか。'},
 ];
+const STAGES=100;
 function windLevel(){const w=Math.abs(G.cfg.wind); return w<12?1:w<22?2:w<30?3:4;}
 const SLOW={start:85,end:9,depth:0.9,vmin:170,vk:4.5};
 // world time the thread takes to reach the needle (used to make wind stages solvable)
 function flyTime(D){let y=0,t=0; const v=300+D*0.22, dt=1/240;
   while(y>-D){const r=y+D, sm=smooth(SLOW.start,SLOW.end,r), ts=1-SLOW.depth*sm; y-=Math.min(v,SLOW.vmin+Math.max(r,0)*SLOW.vk)*dt*ts; t+=dt*ts;}
   return t;}
-function chapterOf(n){return CHAPTERS.find(c=>n>=c.from&&n<=c.to)}
+function chapterOf(n){return CHAPTERS[Math.floor((n-1)/10)]}
 function stageCfg(n){
-  const ch=chapterOf(n), i=CHAPTERS.indexOf(ch);
-  const c={n, ch, speed:32+(n-1)*3.6, D:140+Math.pow(n-1,1.65)*9, A:44+n*0.8,
-    pattern:'tri', offX:0, sway:null, wind:0, shake:null, tremble:0, bob:0};
-  const off=[0,-0.35,0.3,-0.2,0.4][n%5];
+  const i=Math.floor((n-1)/10), k=(n-1)%10, ch=CHAPTERS[i];
+  // difficulty rises across the game, with a dip at the start of each chapter to learn its new trick
+  const base=40+2.2*(n-1)+0.004*(n-1)*(n-1);
+  const c={n,ch,i,k, speed:base*(0.8+0.022*k), D:140+Math.pow(n-1,1.5)*3.5, A:44+n*0.35,
+    pattern:'tri', offX:0, sway:null, wind:0, shake:null, tremble:0, bob:0, dark:null, cat:null, float:null};
+  const off=[0,-0.35,0.3,-0.2,0.4,-0.1,0.25,-0.4,0.15,-0.3][(n*7)%10];
   if(n>3) c.offX=off*c.A;
-  if(n>=9) c.pattern=['tri','sine','jerky'][n%3];
-  if(i===1){c.sway={S:10+(n-6)*4,P:3.4-(n-6)*0.25};}
-  if(i===2){c.wind=(n%2?1:-1)*(14+(n-11)*5);}
-  if(i===3){c.shake={K:9+(n-16)*2.5,J:1.9-(n-16)*0.1};}
-  if(i===4){c.tremble=1.6+(n-21)*0.6; c.sway={S:6,P:4};}
-  if(i===5){c.sway={S:14+(n-26)*3,P:3.1}; c.bob=10; c.wind=(n%2?1:-1)*8; c.pattern='sine';}
+  if(n>=6) c.pattern=['tri','sine','jerky'][n%3];
+  const sway=(S,P)=>{c.sway={S,P}};
+  switch(ch.id){
+    case 'park':  sway(10+k*3,3.6-k*0.15); break;
+    case 'fan':   c.wind=(n%2?1:-1)*(12+k*2.6); break;
+    case 'train': c.shake={K:9+k*1.6,J:2.0-k*0.06}; break;
+    case 'snow':  c.tremble=1.8+k*0.35; if(k>=5) sway(6,4.2); break;
+    case 'sea':   sway(14+k*1.5,3.2-k*0.08); c.bob=10+k; c.wind=(n%2?1:-1)*(6+k*1.2); c.pattern='sine'; break;
+    case 'night': c.dark={P:3.4-k*0.08,len:0.9+k*0.05}; if(k>=4) sway(8+k,3.8); break;
+    case 'cat':   c.D=Math.min(c.D,600+k*40); c.cat={len:0.45}; if(k>=5) c.wind=(n%2?1:-1)*(8+k); break;
+    case 'space': c.float={Sx:14+k*2,Px:4.2-k*0.1,Sy:12+k*2.5,Py:2.9-k*0.05}; if(k>=6) c.tremble=1.5; break;
+    case 'far': {
+      c.D=3000+k*250; c.speed=base*0.8;
+      const mix=[['sway'],['wind'],['shake'],['tremble'],['sway','wind'],['dark'],['float'],['shake','tremble'],['sway','dark'],['sway','wind','tremble']][k];
+      for(const m of mix){
+        if(m==='sway') sway(10,3.6); if(m==='wind') c.wind=(n%2?1:-1)*14; if(m==='shake') c.shake={K:10,J:2.0};
+        if(m==='tremble') c.tremble=2; if(m==='dark') c.dark={P:3.6,len:1.0}; if(m==='float') c.float={Sx:14,Px:4.4,Sy:14,Py:3.1};
+      }
+      if(n===100) c.D=5500;
+    }
+  }
   // wind: place the needle so that the right aim is inside the thread's swing (aim = needle − drift)
-  if(c.wind){c.offX=c.wind*flyTime(c.D)+[0.3,-0.25,0.15,-0.35][n%4]*c.A;}
-  if(i===6){c.D=3300; c.speed=70; c.sway={S:8,P:5}; c.pattern='sine'; c.offX=0;}
+  if(c.wind) c.offX=c.wind*flyTime(c.D)+[0.3,-0.25,0.15,-0.35][n%4]*c.A;
+  // cat: leave a launch window between punches that is longer than the flight
+  if(c.cat) c.cat.P=flyTime(c.D)+c.cat.len+1.6-k*0.06;
   return c;
 }
+const mod=(t,P)=>((t%P)+P)%P;
+function darkness(t){const d=G.cfg.dark; if(!d) return 0; const u=mod(t,d.P), s0=d.P-d.len; return smooth(s0,s0+0.12,u)*(1-smooth(d.P-0.1,d.P,u));}
+function flicker(t){const d=G.cfg.dark; if(!d) return 0; const u=mod(t,d.P), s0=d.P-d.len; return (u>s0-0.6&&u<s0)? (Math.sin(u*70)>0.3?0.5:0):0;}
+function catPunch(t){const c=G.cfg.cat; if(!c) return 0; const u=mod(t,c.P), s0=c.P-c.len; return u>s0? Math.sin(Math.PI*(u-s0)/c.len):0;}
+function catWarn(t){const c=G.cfg.cat; if(!c) return 0; const u=mod(t,c.P), s0=c.P-c.len; return smooth(s0-1.1,s0-0.6,u)*(1-smooth(c.P-0.05,c.P,u));}
 
 /* ---------- save ---------- */
-const SAVE_KEY='hari-ana-challenge-v1';
-const fresh=()=>({coins:100,cleared:{},crowns:{},tries:{},owned:{},eq:{needle:'meriken',thread:'tenui'},tools:{itotoshi:1,hasami:2},sound:true,seenTip:{}});
+const SAVE_KEY='hari-ana-challenge-v2';
+const fresh=()=>({coins:100,cleared:{},crowns:{},tries:{},owned:{},eq:{needle:'meriken',thread:'tenui'},tools:{itotoshi:1,hasami:2},sound:true,seenCh:{}});
 let S=fresh();
 try{const raw=localStorage.getItem(SAVE_KEY); if(raw) S=Object.assign(fresh(),JSON.parse(raw));}catch(e){}
 function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
@@ -356,6 +401,7 @@ const SFX={
   coin(){if(!audio())return; const t=AC.currentTime; tone(t,0.09,1320,1320,{type:'square',g:0.07}); tone(t+0.08,0.25,1760,1760,{type:'square',g:0.07});},
   boing(){if(!audio())return; const t=AC.currentTime; tone(t,0.06,900,380,{type:'triangle',g:0.25}); tone(t+0.06,0.32,340,170,{type:'sine',g:0.28});},
   whiff(){if(!audio())return; const t=AC.currentTime; tone(t,0.35,600,1200,{type:'sine',g:0.12});},
+  meow(){if(!audio())return; const t=AC.currentTime; tone(t,0.35,520,820,{type:'triangle',g:0.08}); tone(t+0.12,0.3,820,560,{type:'triangle',g:0.06});},
   gatan(){if(!audio())return; const t=AC.currentTime; tone(t,0.12,90,50,{g:0.45}); noise(t,0.08,{type:'lowpass',f:400,g:0.3});},
   tap(){if(!audio())return; const t=AC.currentTime; tone(t,0.05,700,500,{type:'triangle',g:0.12});},
 };
@@ -363,22 +409,10 @@ function vibrate(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 
 /* ---------- canvas ---------- */
 const cv=$('c'), ctx=cv.getContext('2d');
-let W=1,H=1,DPR=1,pattern=null;
-function buildPattern(){
-  const s=Math.round(36*DPR), t=document.createElement('canvas'); t.width=t.height=s;
-  const g=t.getContext('2d'); g.strokeStyle='rgba(236,230,214,.085)'; g.lineWidth=Math.max(1,1.6*DPR); g.lineCap='round';
-  const d=s/6;
-  // sashiko 十字刺し: grid stitches with a small cross at the centre
-  g.beginPath();
-  g.moveTo(d*0.5,0); g.lineTo(d*1.8,0); g.moveTo(d*4.2,0); g.lineTo(d*5.5,0);
-  g.moveTo(0,d*0.5); g.lineTo(0,d*1.8); g.moveTo(0,d*4.2); g.lineTo(0,d*5.5);
-  g.moveTo(s/2-d*0.8,s/2); g.lineTo(s/2+d*0.8,s/2); g.moveTo(s/2,s/2-d*0.8); g.lineTo(s/2,s/2+d*0.8);
-  g.stroke();
-  pattern=ctx.createPattern(t,'repeat');
-}
+let W=1,H=1,DPR=1;
 function resize(){
   const r=cv.getBoundingClientRect(); DPR=Math.min(window.devicePixelRatio||1,2.5);
-  W=Math.max(1,r.width); H=Math.max(1,r.height); cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); buildPattern();
+  W=Math.max(1,r.width); H=Math.max(1,r.height); cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
 }
 window.addEventListener('resize',resize);
 
@@ -391,21 +425,23 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const lerp=(a,b,t)=>a+(b-a)*t;
 function smooth(a,b,x){const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)}
 function tri(p,A){const per=4*A; let m=((p%per)+per)%per; return m<2*A? -A+m : 3*A-m;}
-function trem(t){const a=G.cfg.tremble; return a? a*(0.55*Math.sin(t*6.1)+0.3*Math.sin(t*10.7+1.3)+0.15*Math.sin(t*17.3+2.1)) : 0}
+function tremEnv(t){return 0.2+0.8*(0.5+0.5*Math.sin(2*Math.PI*t/3.3))}   // the shiver comes and goes
+function trem(t){const a=G.cfg.tremble; return a? a*tremEnv(t)*(0.55*Math.sin(t*6.1)+0.3*Math.sin(t*10.7+1.3)+0.15*Math.sin(t*17.3+2.1))*1.4 : 0}
 function shakeVal(t){const s=G.cfg.shake; if(!s) return 0; const k=Math.floor(t/s.J), u=t-k*s.J; return (k%2?1:-1)*s.K*(1-Math.exp(-u*28))*Math.exp(-u*2.6);}
 function needlePos(t){
   const c=G.cfg; let x=c.offX, y=-c.D;
   if(c.sway) x+=c.sway.S*Math.sin(2*Math.PI*t/c.sway.P);
   x+=shakeVal(t);
   if(c.bob) y+=c.bob*Math.sin(t*1.4);
+  if(c.float){x+=c.float.Sx*Math.sin(2*Math.PI*t/c.float.Px); y+=c.float.Sy*Math.sin(2*Math.PI*t/c.float.Py+1);}
   return {x,y};
 }
 function effThread(){return curThread().T*(G.use.hasami?0.6:1)}
 function tolerance(){
   const E=curNeedle().E, T=effThread();
   if(T>E*1.05) return -1;
-  let tol=(E-T)/2+Math.min(T*0.3,1.5);
-  if(G.use.itotoshi) tol+=6+E*0.3;
+  let tol=(E-T)/2+Math.min(T*0.15,0.6);
+  if(G.use.itotoshi) tol+=5+E*0.25;
   return tol;
 }
 
@@ -418,13 +454,18 @@ function startStage(n){
   G.confetti=[]; G.floats=[]; G.lastJolt=-1; G.resultShown=false; G.armed={itotoshi:false,hasami:false}; G.use={};
   G.tipY=0; G.baseX=0; makeStreaks();
   show(null); updateHud();
-  const ch=G.cfg.ch;
-  if(!S.seenTip[ch.from]||n===ch.from){toast(`ステージ${n}`,ch.tip,2.2); S.seenTip[ch.from]=1; save();}
-  else toast(`ステージ${n}`,ch.name,1.2);
+  const c=G.cfg;
+  if(c.k===0||!S.seenCh[c.i]){showIntro(); S.seenCh[c.i]=1; save();}
+  else toast(`ステージ${n}`,c.ch.name,1.2);
   $('hint').hidden=false;
 }
+function showIntro(){
+  const c=G.cfg;
+  $('inCh').textContent=`第${c.i+1}章　ステージ${c.i*10+1}〜${c.i*10+10}`; $('inName').textContent=c.ch.name;
+  $('inWhat').textContent=c.ch.what; $('inHow').textContent=c.ch.how; $('intro').hidden=false;
+}
 function updateHud(){
-  const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n}　${c.ch.name}`; const wl=windLevel(); const hw=$('hudWind'); hw.hidden=!c.wind;
+  const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n} / ${STAGES}　${c.ch.name}`; const wl=windLevel(); const hw=$('hudWind'); hw.hidden=!c.wind;
   if(c.wind){hw.innerHTML=`風 <span class="arr">${(c.wind>0?'➤':'◀').repeat(wl)}</span> ${['弱い','ふつう','強い','暴風'][wl-1]}`; hw.style.setProperty('--gx',(c.wind>0?5:-5)+'px');}
   const tries=(S.tries[c.n]||0)+1; $('hudTries').textContent=`挑戦 ${tries}回目`;
   const nd=curNeedle(), th=curThread();
@@ -483,16 +524,16 @@ function showResult(){
   const cb=$('resCrown');
   if(r.crown){cb.hidden=false; cb.innerHTML=crownSvg(22)+(r.newCrown?' 素手クリア！王冠ゲット':' 素手クリア');} else cb.hidden=true;
   $('resLines').innerHTML=r.lines.map(([k,v])=>`<div><span>${k}</span><span class="coin">${v}</span></div>`).join('')+`<div class="tot"><span>合計</span><span class="coin">${r.tot}</span></div>`;
-  $('resNext').hidden=c.n>=30; $('resNext').textContent=c.n>=30?'':'次のステージへ';
+  $('resNext').hidden=c.n>=STAGES;
   $('resDouble').hidden=false; $('resDouble').innerHTML=`広告を見て2倍にする（<span class="coin" style="color:inherit">+${r.tot}</span>）`;
   G.resultShown=true; show('result'); $('hud').hidden=true;
-  if(c.n>=30) $('resTries').textContent+='　全ステージ制覇！';
+  if(c.n>=STAGES) $('resTries').textContent+='　全100ステージ制覇！';
 }
 function toast(big,small,dur=1.4){
   const t=$('toast'); $('toastBig').textContent=big; $('toastSmall').textContent=small||''; t.style.opacity=1;
   clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.opacity=0,dur*1000);
 }
-function floatText(text,x,y,color){G.floats.push({text,x,y,color,t:0});}
+function floatText(text,x,y,color,size=30){G.floats.push({text,x,y,color,size,t:0});}
 function crownSvg(s){return `<svg class="cr" width="${s}" height="${s*0.8}" viewBox="0 0 20 16" aria-hidden="true"><path d="M2 14 L1 4 L6 8 L10 1 L14 8 L19 4 L18 14 Z" fill="#e5b54c" stroke="#121b31" stroke-width="1.4" stroke-linejoin="round"/></svg>`}
 
 /* ---------- confetti ---------- */
@@ -508,8 +549,8 @@ function burst(){
     }
   }
 }
-function makeStreaks(){G.streaks=[];for(let i=0;i<22;i++)G.streaks.push({x:Math.random(),y:Math.random(),l:0.05+Math.random()*0.1,s:0.6+Math.random()*0.8});
-  G.fluff=[];for(let i=0;i<10;i++)G.fluff.push({x:Math.random(),y:Math.random(),r:1.5+Math.random()*2.5,p:Math.random()*6,s:0.5+Math.random()*0.6});}
+function makeStreaks(){G.streaks=[];for(let i=0;i<9;i++)G.streaks.push({x:Math.random(),y:Math.random(),l:0.05+Math.random()*0.1,s:0.6+Math.random()*0.8});
+  G.fluff=[];for(let i=0;i<4;i++)G.fluff.push({x:Math.random(),y:Math.random(),r:1.5+Math.random()*2.5,p:Math.random()*6,s:0.5+Math.random()*0.6});}
 
 /* ---------- update ---------- */
 function update(dt){
@@ -519,7 +560,9 @@ function update(dt){
   const np=needlePos(G.tw);
 
   // train jolt cue
-  if(c.shake){const k=Math.floor(G.tw/c.shake.J); if(k!==G.lastJolt){G.lastJolt=k; if(G.mode==='play'){SFX.gatan(); G.shakePx=Math.min(10,c.shake.K*0.7);}}}
+  if(c.shake){const k=Math.floor(G.tw/c.shake.J); if(k!==G.lastJolt){G.lastJolt=k; if(G.mode==='play'){SFX.gatan(); G.shakePx=Math.min(10,c.shake.K*0.7); floatText('ガタン！',W*0.74,H*0.34,'#ece6d6',24);}}}
+  if(c.tremble&&G.mode==='play'){const e=tremEnv(G.tw); if(e>0.92&&!G.shiver){G.shiver=true; floatText('ぶるぶる…',W*0.26,H*0.72,'#cfe3ff',20);} if(e<0.6) G.shiver=false;}
+  if(c.cat&&G.mode==='play'){const w=catWarn(G.tw)>0.5; if(w&&!G.meowed){G.meowed=true; SFX.meow();} if(!w) G.meowed=false;}
   G.shakePx*=Math.exp(-dt*9);
 
   if(G.st==='aim'){
@@ -540,7 +583,11 @@ function update(dt){
     const vEff=Math.min(G.v,SLOW.vmin+Math.max(r,0)*SLOW.vk);
     G.tipY-=vEff*dtw;
     G.tipX=G.flyX+G.drift+trem(G.tw);
-    if(G.tipY<=np.y) resolve(np);
+    if(catPunch(G.tw)>0.5){   // the cat bats the flying thread away
+      G.res={dx:99,tol:tolerance(),ok:false,np,cat:true}; G.rt=0; G.st='whiff'; G.drift-=70;
+      if(!G.demo){SFX.boing(); vibrate(25);}
+    }
+    else if(G.tipY<=np.y) resolve(np);
   }
   else if(G.st==='pass'){
     // hit-stop, then a slow pull through the eye, then back to normal speed
@@ -560,7 +607,8 @@ function update(dt){
       G.res.told=true;
       if(!G.demo){
         const r=G.res;
-        if(r.tol<0) toast('太すぎて入らない！','穴より糸が太いみたい。お裁縫箱で針か糸を替えてみよう',2.4);
+        if(r.cat) toast('ねこパンチ！','耳が見えたらパンチの合図。合間をねらおう',1.6);
+        else if(r.tol<0) toast('太すぎて入らない！','穴より糸が太いみたい。お裁縫箱で針か糸を替えてみよう',2.4);
         else if(G.st==='whiff') toast('空振り！',`穴まであと ${((Math.abs(r.dx)-r.tol)*MM_PER_U).toFixed(2)}mm`,1.4);
         else{const miss=(Math.abs(r.dx)-r.tol)*MM_PER_U; toast(miss<0.25?'惜しい！':'おっと！',`あと ${miss.toFixed(2)}mm ${r.dx>0?'左':'右'}だった`,1.3);}
         award();
@@ -647,15 +695,12 @@ function drawThread(s,layer,ny){
 }
 function draw(){
   ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillStyle='#1d2b4a'; ctx.fillRect(0,0,cv.width,cv.height);
-  if(pattern){ctx.fillStyle=pattern; ctx.fillRect(0,0,cv.width,cv.height);}
+  ctx.fillStyle='#141b2e'; ctx.fillRect(0,0,cv.width,cv.height);
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const c=G.cfg;
 
-  // ambience
+  drawBackground(c);
   if(c.wind) drawWind(c);
-  if(c.bob){ctx.strokeStyle='rgba(127,166,255,.14)'; ctx.lineWidth=2;
-    for(let j=0;j<4;j++){ctx.beginPath(); for(let x=0;x<=W;x+=12){const y=H*0.86+j*16+Math.sin(x*0.025+G.tw*1.5+j)*6; x?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();}}
 
   if(G.sm>0.01){ctx.fillStyle=`rgba(5,8,16,${0.55*G.sm})`; ctx.fillRect(0,0,W,H);}   // dim the room
   const cam=camera(), nd=curNeedle();
@@ -665,6 +710,11 @@ function draw(){
   drawNeedle(cam.np.x,cam.np.y,nd);
   drawThread(cam.s,'front',cam.np.y);
   ctx.restore();
+
+  // night: the lamp goes out
+  const dk=Math.max(darkness(G.tw),flicker(G.tw));
+  if(dk>0){ctx.fillStyle=`rgba(3,4,9,${0.93*dk})`; ctx.fillRect(0,0,W,H);}
+  if(c.cat) drawCat(c,(G.tipY-cam.cy)*cam.s+H/2);
 
   // glint marker when the eye is tiny on screen
   const eyePx=nd.E*cam.s;
@@ -688,8 +738,8 @@ function draw(){
   for(const p of G.confetti){ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.scale(1,Math.abs(Math.cos(p.r*1.7))+0.15);
     ctx.globalAlpha=clamp(p.life,0,1); ctx.fillStyle=p.c; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();}
   // floats
-  ctx.textAlign='center'; ctx.font='900 30px "Zen Maru Gothic",system-ui,sans-serif';
-  for(const f of G.floats){ctx.globalAlpha=1-f.t/1.2; ctx.fillStyle=f.color; ctx.fillText(f.text,f.x,f.y-f.t*60);}
+  ctx.textAlign='center';
+  for(const f of G.floats){ctx.font=`900 ${f.size}px "Zen Maru Gothic",system-ui,sans-serif`; ctx.globalAlpha=1-f.t/1.2; ctx.fillStyle=f.color; ctx.fillText(f.text,f.x,f.y-f.t*60);}
   ctx.globalAlpha=1;
 }
 
@@ -704,22 +754,225 @@ function drawFocusLines(){
 }
 function drawWind(c){
   const dir=Math.sign(c.wind), lvl=windLevel(), a=1-0.6*G.sm;
-  // electric fan at the upwind edge
+  // electric fan at the upwind edge (indoors only)
+  if(c.ch.id==='fan'||c.ch.id==='cat'){
   const fx=dir>0?-30:W+30, fy=H*0.66, fr=Math.min(110,W*0.26);
-  ctx.save(); ctx.globalAlpha=0.55*a; ctx.translate(fx,fy);
+  ctx.save(); ctx.globalAlpha=0.4*a; ctx.translate(fx,fy);
   ctx.strokeStyle='#ece6d6'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,fr,0,Math.PI*2); ctx.stroke();
   for(let i=0;i<12;i++){const t=i/12*Math.PI*2; ctx.beginPath(); ctx.moveTo(Math.cos(t)*fr*0.2,Math.sin(t)*fr*0.2); ctx.lineTo(Math.cos(t)*fr,Math.sin(t)*fr); ctx.lineWidth=1; ctx.stroke();}
   ctx.rotate(G.fanA); ctx.fillStyle='rgba(127,166,255,.55)';
   for(let i=0;i<3;i++){ctx.rotate(Math.PI*2/3); ctx.beginPath(); ctx.ellipse(fr*0.5,0,fr*0.42,fr*0.2,0.35,0,Math.PI*2); ctx.fill();}
   ctx.fillStyle='#ece6d6'; ctx.beginPath(); ctx.arc(0,0,fr*0.13,0,Math.PI*2); ctx.fill(); ctx.restore();
+  }
   // gust lines: wavy, longer and brighter when the wind is stronger
   ctx.lineCap='round';
   for(const st of G.streaks){const x=st.x*W, y=st.y*H, L=(0.08+lvl*0.05)*W*st.l*8;
-    ctx.strokeStyle=`rgba(236,230,214,${(0.18+lvl*0.07)*a})`; ctx.lineWidth=1.2+lvl*0.5;
+    ctx.strokeStyle=`rgba(236,230,214,${(0.12+lvl*0.05)*a})`; ctx.lineWidth=1+lvl*0.4;
     ctx.beginPath(); for(let k=0;k<=8;k++){const xx=x-dir*L*k/8, yy=y+Math.sin(k*0.8+G.tw*6+st.y*20)*3*lvl; k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);} ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-dir*6,y-4); ctx.moveTo(x,y); ctx.lineTo(x-dir*6,y+4); ctx.stroke();}
   // drifting lint (綿ぼこり)
-  for(const f of G.fluff){ctx.fillStyle=`rgba(236,230,214,${0.55*a})`; ctx.beginPath(); ctx.arc(f.x*W,f.y*H+Math.sin(G.tw*3+f.p)*10,f.r,0,Math.PI*2); ctx.fill();}
+  for(const f of G.fluff){ctx.fillStyle=`rgba(236,230,214,${0.4*a})`; ctx.beginPath(); ctx.arc(f.x*W,f.y*H+Math.sin(G.tw*3+f.p)*10,f.r,0,Math.PI*2); ctx.fill();}
+}
+
+/* ---------- chapter backgrounds ----------
+   Soft, low-contrast scenes with no grid or straight vertical lines near the play area,
+   so nothing in the background can be used as an aiming guide. */
+const BGM=70; let bgKey='', bgCv=null;
+function rng(seed){let s=seed>>>0; return ()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296);}
+function vgrad(g,y0,y1,stops){const gr=g.createLinearGradient(0,y0,0,y1); for(const [o,c] of stops) gr.addColorStop(o,c); return gr;}
+function glow(g,x,y,r,col){const gr=g.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,col); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(x-r,y-r,2*r,2*r);}
+function rrect(g,x,y,w,h,r){g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();}
+function sky(g,W,H,stops){g.fillStyle=vgrad(g,-BGM,H+BGM,stops); g.fillRect(-BGM,-BGM,W+2*BGM,H+2*BGM);}
+
+const BG={
+  chabudai:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#2a2019'],[0.6,'#33271c'],[1,'#1b140f']]);
+      glow(g,W*0.2,H*0.04,Math.max(W,H)*0.8,'rgba(255,196,120,.15)');
+      g.fillStyle='#432f20'; g.beginPath(); g.ellipse(W/2,H*1.08,W*0.98,H*0.3,0,0,Math.PI*2); g.fill();
+      g.strokeStyle='rgba(255,220,170,.12)'; g.lineWidth=5; g.stroke();
+      g.strokeStyle='rgba(0,0,0,.2)'; g.lineWidth=2;
+      for(let i=1;i<4;i++){g.beginPath(); g.ellipse(W/2,H*1.08,W*0.98-i*30,H*0.3-i*13,0,Math.PI*1.1,Math.PI*1.9); g.stroke();}
+      // teacup
+      g.fillStyle='#56685b'; rrect(g,W*0.07,H*0.83,W*0.14,H*0.075,10); g.fill();
+      g.fillStyle='rgba(255,255,255,.08)'; rrect(g,W*0.085,H*0.835,W*0.035,H*0.065,8); g.fill();
+      // spool of red thread
+      g.fillStyle='#7a5a3a'; rrect(g,W*0.78,H*0.85,W*0.14,H*0.014,4); g.fill(); rrect(g,W*0.78,H*0.9,W*0.14,H*0.014,4); g.fill();
+      g.fillStyle='#a63c35'; rrect(g,W*0.795,H*0.862,W*0.11,H*0.04,4); g.fill();
+    },
+    a(g,W,H,t){ // steam from the teacup
+      g.strokeStyle='rgba(255,240,220,.10)'; g.lineWidth=3; g.lineCap='round';
+      for(let j=0;j<2;j++){g.beginPath(); for(let k=0;k<=12;k++){const y=H*0.82-k*6, x=W*(0.12+j*0.04)+Math.sin(k*0.6+t*2+j)*5; k?g.lineTo(x,y):g.moveTo(x,y);} g.stroke();}
+    }
+  },
+  park:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#202449'],[0.5,'#563c66'],[0.74,'#a8665a'],[0.75,'#1a1629'],[1,'#120f1e']]);
+      glow(g,W*0.72,H*0.72,W*0.6,'rgba(255,170,110,.25)');
+      g.fillStyle='#f0b48a'; g.globalAlpha=0.6; g.beginPath(); g.arc(W*0.72,H*0.73,W*0.07,0,Math.PI*2); g.fill(); g.globalAlpha=1;
+      g.fillStyle='#17132a'; g.beginPath(); g.moveTo(-BGM,H*0.78); g.quadraticCurveTo(W*0.3,H*0.71,W*0.6,H*0.76); g.quadraticCurveTo(W*0.85,H*0.8,W+BGM,H*0.74); g.lineTo(W+BGM,H+BGM); g.lineTo(-BGM,H+BGM); g.fill();
+      const r=rng(7); g.fillStyle='#120f22';
+      for(let i=0;i<9;i++){const x=i<5? -BGM+r()*W*0.3 : W*0.75+r()*(W*0.25+BGM); g.beginPath(); g.arc(x,H*(0.7+r()*0.06),25+r()*30,0,Math.PI*2); g.fill();}
+    },
+    a(g,W,H,t){g.fillStyle='rgba(255,220,230,.07)';
+      for(let i=0;i<3;i++){const x=mod(i*W*0.45+t*8,W+200)-100, y=H*(0.12+i*0.1); g.beginPath(); g.ellipse(x,y,70,16,0,0,Math.PI*2); g.ellipse(x+40,y-8,50,14,0,0,Math.PI*2); g.fill();}}
+  },
+  fan:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#0f2b35'],[0.6,'#143b46'],[1,'#0b1e25']]);
+      g.fillStyle='#0c1d2c'; g.beginPath(); g.arc(W*0.84,H*0.12,W*0.2,0,Math.PI*2); g.fill();
+      glow(g,W*0.8,H*0.11,W*0.25,'rgba(255,245,210,.25)');
+      g.fillStyle='#f3ecd0'; g.beginPath(); g.arc(W*0.8,H*0.11,W*0.045,0,Math.PI*2); g.fill();
+      // mosquito coil (蚊取り線香)
+      g.fillStyle='#3b3f3a'; g.beginPath(); g.ellipse(W*0.14,H*0.9,W*0.12,H*0.035,0,0,Math.PI*2); g.fill();
+      g.strokeStyle='#5f8a45'; g.lineWidth=4; g.beginPath();
+      for(let a=0;a<Math.PI*7;a+=0.15){const rr=3+a*2.1, x=W*0.14+Math.cos(a)*rr, y=H*0.885+Math.sin(a)*rr*0.35; a?g.lineTo(x,y):g.moveTo(x,y);} g.stroke();
+    },
+    a(g,W,H,t,c){
+      // wind chime (風鈴) swinging in the breeze
+      const sw=0.25*Math.sin(t*3.2)+Math.sign(c.wind||0)*0.35;
+      g.save(); g.translate(W*0.2,0); g.strokeStyle='rgba(236,230,214,.35)'; g.lineWidth=1.5;
+      g.beginPath(); g.moveTo(0,0); g.lineTo(0,H*0.06); g.stroke();
+      g.fillStyle='rgba(160,210,240,.45)'; g.beginPath(); g.arc(0,H*0.075,16,Math.PI,0); g.lineTo(16,H*0.08); g.lineTo(-16,H*0.08); g.fill();
+      g.translate(0,H*0.08); g.rotate(sw); g.beginPath(); g.moveTo(0,0); g.lineTo(0,28); g.stroke();
+      g.fillStyle='rgba(210,64,58,.6)'; g.fillRect(-7,28,14,38); g.restore();
+      // coil smoke, bent by the wind
+      g.strokeStyle='rgba(220,230,230,.12)'; g.lineWidth=3; g.beginPath();
+      for(let k=0;k<=14;k++){const y=H*0.88-k*8, x=W*0.14+Math.sin(k*0.7+t*2)*4+Math.sign(c.wind||0)*k*k*0.5; k?g.lineTo(x,y):g.moveTo(x,y);} g.stroke();
+    }
+  },
+  train:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#272c38'],[1,'#191c25']]);
+      g.fillStyle='#0b101b'; rrect(g,W*0.04,H*0.06,W*0.92,H*0.22,18); g.fill();
+      g.strokeStyle='#4a5160'; g.lineWidth=6; g.stroke();
+      g.fillStyle='#2e3f6c'; rrect(g,-BGM,H*0.89,W+2*BGM,H*0.2,20); g.fill();
+      g.fillStyle='rgba(255,255,255,.06)'; g.fillRect(-BGM,H*0.895,W+2*BGM,6);
+    },
+    a(g,W,H,t,c){
+      // city lights rushing past the window
+      g.save(); rrect(g,W*0.04,H*0.06,W*0.92,H*0.22,18); g.clip();
+      const r=rng(3);
+      for(let i=0;i<16;i++){const sp=180+r()*260, y=H*(0.09+r()*0.17), x=W-mod(r()*W*2+t*sp,W*1.6), col=r()<0.5?'255,214,150':'200,225,255';
+        g.fillStyle=`rgba(${col},.55)`; g.fillRect(x,y,4+r()*6,3); g.fillStyle=`rgba(${col},.12)`; g.fillRect(x,y,40+r()*50,3);}
+      g.restore();
+      // hand straps swinging after each jolt
+      const j=c.shake?shakeVal(t)*0.025:0;
+      for(let i=0;i<4;i++){const x=W*(0.14+i*0.24), a=0.05*Math.sin(t*1.3+i)+j;
+        g.save(); g.translate(x,0); g.rotate(a); g.strokeStyle='rgba(220,220,225,.35)'; g.lineWidth=5; g.beginPath(); g.moveTo(0,0); g.lineTo(0,H*0.05); g.stroke();
+        g.lineWidth=3; g.beginPath(); g.arc(0,H*0.05+11,11,0,Math.PI*2); g.stroke(); g.restore();}
+    }
+  },
+  snow:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#19263e'],[0.55,'#22365a'],[1,'#131d33']]);
+      g.fillStyle='#2e4a70'; g.beginPath(); g.ellipse(W/2,H*0.12,W*0.42,H*0.1,0,0,Math.PI*2); g.fill();
+      glow(g,W*0.12,H*0.04,W*0.25,'rgba(235,245,255,.35)'); glow(g,W*0.88,H*0.23,W*0.2,'rgba(235,245,255,.25)');
+      g.fillStyle='#7a3a3a'; g.beginPath(); g.ellipse(W/2,H*1.02,W*0.8,H*0.13,0,0,Math.PI*2); g.fill();
+      g.fillStyle='rgba(255,230,200,.12)'; const r=rng(11); for(let i=0;i<40;i++){g.beginPath(); g.arc(W*(0.05+r()*0.9),H*(0.92+r()*0.08),3,0,Math.PI*2); g.fill();}
+    },
+    a(g,W,H,t){g.fillStyle='rgba(235,242,255,.35)'; const r=rng(5);
+      for(let i=0;i<34;i++){const sp=0.03+r()*0.05, x=W*(r()+0.03*Math.sin(t*0.8+i)), y=mod(r()+t*sp,1.1)*H-H*0.05; g.beginPath(); g.arc(x,y,1.2+r()*2.2,0,Math.PI*2); g.fill();}}
+  },
+  sea:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#1c3150'],[0.55,'#3d6587'],[0.56,'#143551'],[1,'#091a2b']]);
+      glow(g,W*0.25,H*0.5,W*0.5,'rgba(255,230,180,.22)');
+      g.fillStyle='rgba(255,240,200,.7)'; g.beginPath(); g.arc(W*0.25,H*0.5,W*0.05,Math.PI,0); g.fill();
+    },
+    a(g,W,H,t){
+      g.strokeStyle='rgba(150,190,235,.16)'; g.lineWidth=2;
+      for(let j=0;j<5;j++){g.beginPath(); for(let x=-20;x<=W+20;x+=14){const y=H*(0.62+j*0.08)+Math.sin(x*0.02+t*1.5+j*1.7)*(4+j*2); x>-20?g.lineTo(x,y):g.moveTo(x,y);} g.stroke();}
+      g.strokeStyle='rgba(236,230,214,.45)'; g.lineWidth=2;
+      for(let i=0;i<2;i++){const x=mod(t*22+i*W*0.6,W+80)-40, y=H*(0.2+i*0.08)+Math.sin(t*2+i)*6, f=Math.sin(t*6+i)*4;
+        g.beginPath(); g.moveTo(x-10,y-3+f); g.quadraticCurveTo(x-4,y-6,x,y); g.quadraticCurveTo(x+4,y-6,x+10,y-3+f); g.stroke();}
+    }
+  },
+  night:{
+    s(g,W,H){sky(g,W,H,[[0,'#0d0f17'],[1,'#12141d']]);
+      g.fillStyle='#1b1a1f'; rrect(g,-BGM,H*0.9,W+2*BGM,H*0.2,10); g.fill();},
+    a(g,W,H,t){
+      const light=1-Math.max(darkness(t),flicker(t));
+      glow(g,W/2,H*0.05,Math.max(W,H)*0.85,`rgba(255,205,130,${0.2*light})`);
+      g.fillStyle='#3a3226'; g.beginPath(); g.moveTo(W*0.4,H*0.045); g.lineTo(W*0.6,H*0.045); g.lineTo(W*0.66,H*0.085); g.lineTo(W*0.34,H*0.085); g.fill();
+      g.fillStyle=`rgba(255,230,170,${0.25+0.75*light})`; g.beginPath(); g.arc(W/2,H*0.09,10,0,Math.PI*2); g.fill();
+    }
+  },
+  cat:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#2a2130'],[0.6,'#36293a'],[1,'#1f1823']]);
+      g.fillStyle=vgrad(g,0,H*0.28,[[0,'#6a4a7a'],[1,'#d98a6a']]); g.beginPath(); g.arc(W*0.08,H*0.13,W*0.22,0,Math.PI*2); g.fill();
+      // ball of yarn
+      const x=W*0.16,y=H*0.9,rr=W*0.09; g.fillStyle='#b8607e'; g.beginPath(); g.arc(x,y,rr,0,Math.PI*2); g.fill();
+      g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=2;
+      for(let i=0;i<5;i++){g.beginPath(); g.ellipse(x,y,rr*0.95,rr*(0.25+i*0.15),0.6+i*0.3,0,Math.PI*2); g.stroke();}
+      g.strokeStyle='#b8607e'; g.lineWidth=3; g.beginPath(); g.moveTo(x+rr*0.8,y+rr*0.5); g.quadraticCurveTo(W*0.4,H*0.98,W*0.55,H*0.95); g.stroke();
+    }
+  },
+  space:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#03050c'],[1,'#0b1430']]);
+      const r=rng(9); for(let i=0;i<140;i++){g.fillStyle=`rgba(255,255,255,${0.15+r()*0.5})`; g.fillRect(-BGM+r()*(W+2*BGM),-BGM+r()*(H+2*BGM),1.5,1.5);}
+      const cx=W*0.6, cy=H*1.5, R=H*0.72;
+      glow(g,cx,cy,R*1.15,'rgba(110,170,255,.35)');
+      const e=g.createRadialGradient(cx-R*0.3,cy-R*0.5,R*0.1,cx,cy,R); e.addColorStop(0,'#3d7fc4'); e.addColorStop(0.7,'#1d4f8a'); e.addColorStop(1,'#0d2a52');
+      g.fillStyle=e; g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.fill();
+      g.fillStyle='rgba(90,150,90,.45)'; g.beginPath(); g.ellipse(cx-R*0.2,cy-R*0.86,R*0.25,R*0.07,0.2,0,Math.PI*2); g.fill();
+    },
+    a(g,W,H,t){const r=rng(21); for(let i=0;i<14;i++){const x=r()*W, y=r()*H*0.7, a=0.5+0.5*Math.sin(t*(1+r()*2)+i); g.fillStyle=`rgba(255,255,255,${0.7*a})`; g.beginPath(); g.arc(x,y,1.6,0,Math.PI*2); g.fill();}}
+  },
+  far:{
+    s(g,W,H){
+      sky(g,W,H,[[0,'#1a1e3c'],[0.45,'#4a3c69'],[0.66,'#c2856a'],[1,'#c2856a']]);
+      glow(g,W*0.5,H*0.66,W*0.7,'rgba(255,200,150,.3)');
+      const layers=[['#3a3358',0.6,40],['#2a2645',0.7,60],['#1b1a30',0.82,80]];
+      layers.forEach(([col,base,amp],li)=>{const r=rng(31+li); g.fillStyle=col; g.beginPath(); g.moveTo(-BGM,H+BGM);
+        for(let x=-BGM;x<=W+BGM;x+=W/6){g.lineTo(x,H*base-r()*amp);} g.lineTo(W+BGM,H+BGM); g.fill();
+        g.fillStyle='rgba(230,200,210,.06)'; g.fillRect(-BGM,H*base+10,W+2*BGM,30);});
+    },
+    a(g,W,H,t){g.fillStyle='rgba(240,220,230,.06)'; for(let i=0;i<3;i++){const x=mod(i*W*0.5+t*6,W+300)-150; g.beginPath(); g.ellipse(x,H*(0.64+i*0.08),160,18,0,0,Math.PI*2); g.fill();}}
+  },
+};
+function bgOffset(c){
+  const t=G.tw; let x=0,y=0;
+  if(c.sway) x+=c.sway.S*Math.sin(2*Math.PI*t/c.sway.P)*(c.ch.id==='park'?0.6:0.25);
+  if(c.bob) y+=c.bob*Math.sin(t*1.4)*1.6;
+  if(c.shake) x+=shakeVal(t)*0.8;
+  if(c.float) y+=c.float.Sy*0.15*Math.sin(2*Math.PI*t/c.float.Py+1);
+  return {x:clamp(x,-BGM+4,BGM-4),y:clamp(y,-BGM+4,BGM-4)};
+}
+function drawBackground(c){
+  const id=c.ch.id, key=id+'|'+W+'|'+H+'|'+DPR;
+  if(key!==bgKey){
+    bgCv=document.createElement('canvas'); bgCv.width=Math.ceil((W+2*BGM)*DPR); bgCv.height=Math.ceil((H+2*BGM)*DPR);
+    const g=bgCv.getContext('2d'); g.setTransform(DPR,0,0,DPR,BGM*DPR,BGM*DPR); BG[id].s(g,W,H); bgKey=key;
+  }
+  const o=bgOffset(c);
+  ctx.drawImage(bgCv,-BGM+o.x,-BGM+o.y,W+2*BGM,H+2*BGM);
+  if(BG[id].a){ctx.save(); ctx.translate(o.x,o.y); BG[id].a(ctx,W,H,G.tw,c); ctx.restore();}
+}
+/* the cat: ears peek in from the right as a warning, then a paw swipes across */
+function drawCat(c,ty){
+  const warn=catWarn(G.tw), p=catPunch(G.tw), fur='#e09a52';
+  const y=clamp(ty,H*0.3,H*0.85);
+  const peek=Math.max(warn,p>0?1:0);
+  if(peek>0.01){
+    const hx=W+46-56*peek, hy=H*0.6;
+    ctx.fillStyle=fur;
+    ctx.beginPath(); ctx.moveTo(hx-30,hy-30); ctx.lineTo(hx-34,hy-66); ctx.lineTo(hx-4,hy-40); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(hx+6,hy-40); ctx.lineTo(hx+20,hy-70); ctx.lineTo(hx+34,hy-34); ctx.fill();
+    ctx.beginPath(); ctx.arc(hx,hy,46,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#b06a2e'; ctx.lineWidth=4; for(let i=0;i<3;i++){ctx.beginPath(); ctx.moveTo(hx-12+i*12,hy-44); ctx.lineTo(hx-10+i*12,hy-30); ctx.stroke();}
+    ctx.fillStyle='#f4d35e'; ctx.beginPath(); ctx.ellipse(hx-22,hy-4,9,11,0,0,Math.PI*2); ctx.ellipse(hx+4,hy-4,9,11,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#1a1410'; ctx.beginPath(); ctx.ellipse(hx-22,hy-4,2.5,9,0,0,Math.PI*2); ctx.ellipse(hx+4,hy-4,2.5,9,0,0,Math.PI*2); ctx.fill();
+  }
+  if(p>0){
+    const ext=p*W*0.8, x=W+30-ext;
+    ctx.strokeStyle=fur; ctx.lineCap='round'; ctx.lineWidth=38; ctx.beginPath(); ctx.moveTo(W+40,y+20); ctx.lineTo(x,y); ctx.stroke();
+    ctx.fillStyle='#f0b070'; ctx.beginPath(); ctx.arc(x,y,26,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#f2a7b5'; ctx.beginPath(); ctx.ellipse(x+2,y+6,10,8,0,0,Math.PI*2); ctx.fill();
+    for(let i=0;i<4;i++){const a=-2.3+i*0.5; ctx.beginPath(); ctx.arc(x+Math.cos(a)*17,y+Math.sin(a)*17,4.5,0,Math.PI*2); ctx.fill();}
+  }
 }
 
 /* ---------- loop ---------- */
@@ -745,6 +998,8 @@ for(const k of ['itotoshi','hasami']){
     G.armed[k]=!G.armed[k]; SFX.tap(); updateHud();
   };
 }
+$('inStart').onclick=()=>{SFX.tap(); $('intro').hidden=true;};
+$('hudHelp').onclick=()=>{SFX.tap(); showIntro();};
 $('tAd').onclick=()=>playAd(()=>updateHud());
 
 function playAd(done,amount=REWARD.ad){
@@ -767,11 +1022,11 @@ $('soundBtn').onclick=()=>{S.sound=!S.sound; save(); renderSound(); if(S.sound){
 function openStages(){
   G.mode='menu';
   const wrap=$('chapters'); wrap.innerHTML='';
-  CHAPTERS.forEach(ch=>{
+  CHAPTERS.forEach((ch,ci)=>{
     const sec=document.createElement('div'); sec.className='chapter';
-    sec.innerHTML=`<h3>${ch.name}<span>${ch.sub}</span></h3>`;
+    sec.innerHTML=`<h3>第${ci+1}章　${ch.name}<span>${ch.sub}</span></h3>`;
     const grid=document.createElement('div'); grid.className='grid';
-    for(let n=ch.from;n<=ch.to;n++){
+    for(let n=ci*10+1;n<=ci*10+10;n++){
       const b=document.createElement('button'); b.className='cell';
       const locked=n>1&&!S.cleared[n-1];
       if(S.cleared[n]) b.classList.add('clear'); if(locked) b.classList.add('lock');
@@ -819,7 +1074,7 @@ function renderShop(){
   }else{
     html+=card(`<div><div class="nm">広告を見る</div><div class="meter">短い動画を見て +${REWARD.ad}コイン</div></div>
       <button class="btn gold sm" id="shopAd">見る</button><div class="ds">試作版ではダミーの画面が5秒出ます。</div>`);
-    [['ひとつかみ',300,'120円'],['お裁縫箱いっぱい',1000,'370円'],['呉服屋さん',3000,'980円']].forEach(([n,c,p])=>{
+    [['ひとつかみ',500,'120円'],['お裁縫箱いっぱい',1800,'370円'],['呉服屋さん',5500,'980円']].forEach(([n,c,p])=>{
       html+=card(`<div><div class="nm">${n}</div><div class="meter"><span class="coin">${c.toLocaleString()}</span></div></div>
         <button class="btn sub sm" disabled>${p}</button><div class="ds">アプリ版で購入できるようになります。</div>`);
     });
@@ -835,7 +1090,7 @@ function renderShop(){
 }
 
 /* result buttons */
-$('resNext').onclick=()=>{SFX.tap(); startStage(Math.min(30,G.n+1));};
+$('resNext').onclick=()=>{SFX.tap(); startStage(Math.min(STAGES,G.n+1));};
 $('resAgain').onclick=()=>{SFX.tap(); startStage(G.n);};
 $('resList').onclick=()=>{SFX.tap(); G.mode='menu'; G.demo=true; G.st='aim'; G.confetti=[]; openStages();};
 
