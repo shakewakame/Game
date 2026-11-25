@@ -364,22 +364,26 @@ const STAGES=100;
 function windLevel(){const w=Math.abs(G.cfg.wind); return w<12?1:w<22?2:w<30?3:4;}
 const SLOW={start:85,end:9,depth:0.9,vmin:170,vk:4.5};
 // world time the thread takes to reach the needle (used to make wind stages solvable)
-function flyTime(D){let y=0,t=0; const v=300+D*0.22, dt=1/240;
-  while(y>-D){const r=y+D, sm=smooth(SLOW.start,SLOW.end,r), ts=1-SLOW.depth*sm; y-=Math.min(v,SLOW.vmin+Math.max(r,0)*SLOW.vk)*dt*ts; t+=dt*ts;}
-  return t;}
+function flyTimes(D,DA){let y=0,t=0,tA=0; const v=300+D*0.22, dt=1/240;
+  for(const stop of (DA?[DA,D]:[D])){
+    while(y>-stop){const r=y+stop, sm=smooth(SLOW.start,SLOW.end,r), ts=1-SLOW.depth*sm; y-=Math.min(v,SLOW.vmin+Math.max(r,0)*SLOW.vk)*dt*ts; t+=dt*ts;}
+    if(stop===DA) tA=t;
+  }
+  return {tA,tB:t};}
+function flyTime(D,DA){return flyTimes(D,DA).tB}
 function chapterOf(n){return CHAPTERS[Math.floor((n-1)/10)]}
 // the same ten twists run through every chapter, on top of the chapter's own trick
 const VARIANTS=[
   {name:'基本',     desc:'この章の仕掛けに慣れよう'},
   {name:'ゆらゆら', desc:'糸が端でゆっくり、真ん中で速く動く', pattern:'sine'},
   {name:'小刻み',   desc:'糸の動く幅がせまくて速い', A:0.55, sp:1.1},
-  {name:'2本通し',  desc:'2回通せばクリア。失敗しても1本目は消えない', need:2, sp:0.85},
+  {name:'二本抜き', desc:'針が2本。手前の針が奥の針とそろった瞬間を狙って、2本まとめて通せ', twin:true, sp:0.9},
   {name:'気まぐれ', desc:'糸が速くなったり遅くなったりする', pattern:'jerky'},
   {name:'大振り',   desc:'糸が大きく動く', A:1.45},
   {name:'ためらい', desc:'糸がときどきピタッと止まる。止まった瞬間がチャンス？', pattern:'pause'},
   {name:'精密',     desc:'当たりの幅がせまい。そのかわりクリア報酬1.5倍', tol:0.7, sp:0.85, bonus:1.5},
   {name:'早業',     desc:'糸がとても速い', sp:1.25},
-  {name:'総仕上げ', desc:'気まぐれな糸を2回通せばクリア', pattern:'jerky', need:2, sp:0.8},
+  {name:'総仕上げ', desc:'気まぐれな糸で、2本まとめて通せ', pattern:'jerky', twin:true, sp:0.85},
 ];
 function stageCfg(n){
   const i=Math.floor((n-1)/10), k=(n-1)%10, ch=CHAPTERS[i];
@@ -411,10 +415,13 @@ function stageCfg(n){
       if(n===100) c.D=5500;
     }
   }
+  // two needles: the near one (A) sits halfway and slides into line with the far one (B), rests there, then slides away
+  if(v.twin){const DA=Math.round(c.D*0.5); const ft=flyTimes(c.D,DA); c.twin={DA,P:4.4,rest:1.7,S:c.A*0.9+20,lead:c.wind*(ft.tB-ft.tA)};}
+  const T=(c.wind||c.cat)?flyTime(c.D,c.twin&&c.twin.DA):0;
   // wind: place the needle so that the right aim is inside the thread's swing (aim = needle − drift)
-  if(c.wind) c.offX=c.wind*flyTime(c.D)+[0.3,-0.25,0.15,-0.35][n%4]*c.A;
+  if(c.wind) c.offX=c.wind*T+[0.3,-0.25,0.15,-0.35][n%4]*c.A;
   // cat: leave a launch window between punches that is longer than the flight
-  if(c.cat) c.cat.P=flyTime(c.D)+c.cat.len+1.6-k*0.06;
+  if(c.cat) c.cat.P=T+c.cat.len+1.6-k*0.06;
   return c;
 }
 const mod=(t,P)=>((t%P)+P)%P;
@@ -521,6 +528,13 @@ function tolOf(E,T,use={}){
   if(use.itotoshi) tol+=8+E*0.3;
   return tol;
 }
+function needleAPos(t){   // the near needle of a 二本抜き stage
+  const tw=G.cfg.twin, b=needlePos(t), u=mod(t,tw.P);
+  if(G.passedA&&G.ax!==undefined) return {x:G.ax,y:-tw.DA};   // stays put once the thread is through
+  const slide=u<tw.rest?0:tw.S*Math.sin(Math.PI*(u-tw.rest)/(tw.P-tw.rest));
+  return {x:b.x-tw.lead+slide, y:-tw.DA};
+}
+function aligned(t){const tw=G.cfg.twin; return tw&&mod(t,tw.P)<tw.rest;}
 function effThread(){return curThread().T*(G.use.hasami?0.5:1)}
 function tolerance(){const t=tolOf(curNeedle().E,curThread().T,G.use); return t<0?t:t*(G.cfg.tolMul||1)}
 function visUse(){return (G.st==='aim'||G.st==='retract')?G.armed:G.use}   // tools shown on screen: armed while aiming, in use while flying
@@ -531,7 +545,7 @@ function refreshCoins(){['hudCoins','titleCoins','stCoins','shCoins'].forEach(i=
 
 function startStage(n){
   G.mode='play'; G.demo=false; G.n=n; G.cfg=stageCfg(n); G.tw=0; G.phase=Math.random()*4*G.cfg.A; G.st='aim'; G.camK=0;
-  G.streak=0; G.confetti=[]; G.floats=[]; G.lastJolt=-1; G.resultShown=false; G.armed={itotoshi:false,hasami:false}; G.use={};
+  G.streak=0; G.passedA=false; G.confetti=[]; G.floats=[]; G.lastJolt=-1; G.resultShown=false; G.armed={itotoshi:false,hasami:false}; G.use={};
   G.tipY=0; G.baseX=0; makeStreaks();
   show(null); updateHud();
   const c=G.cfg;
@@ -660,9 +674,10 @@ function update(dt){
   }
   else if(G.st==='fly'){
     // the thread runs in front of the needle and dives into the eye at the needle's centre line
-    const r=G.tipY-np.y;
-    const zone=Math.max(110,Math.min(c.D*0.55,520));
-    G.camK=smooth(zone,20,r);
+    const first=c.twin&&!G.passedA, tgt=first?needleAPos(G.tw):np;
+    const r=G.tipY-tgt.y, leg=first?c.twin.DA:(c.twin?c.D-c.twin.DA:c.D);
+    const zone=Math.max(110,Math.min(leg*0.55,520));
+    G.camK+=(smooth(zone,20,r)-G.camK)*clamp(dt*8,0,1);
     G.sm=smooth(SLOW.start,SLOW.end,r); G.ts=1-SLOW.depth*G.sm;
     G.drift+=c.wind*dtw;
     const vEff=Math.min(G.v,SLOW.vmin+Math.max(r,0)*SLOW.vk);
@@ -672,7 +687,13 @@ function update(dt){
       G.res={dx:99,tol:tolerance(),ok:false,np,cat:true}; G.rt=0; G.st='whiff'; G.drift-=70;
       if(!G.demo){SFX.boing(); vibrate(25);}
     }
-    else if(G.tipY<=np.y) resolve(np);
+    else if(G.tipY<=tgt.y){
+      if(first){   // through the near needle? keep going to the far one
+        const dx=G.tipX-tgt.x, tol=tolerance();
+        if((DBG.on&&DBG.always&&!G.demo)||(tol>=0&&Math.abs(dx)<=tol+0.15)){G.passedA=true; G.ax=tgt.x; if(!G.demo){SFX.slip(); floatText('1本目！',W*0.5,H*0.36,'#ece6d6',28);}}
+        else {resolve(tgt); G.res.atA=true;}
+      } else resolve(np);
+    }
   }
   else if(G.st==='pass'){
     // hit-stop, then a slow pull through the eye, then back to normal speed
@@ -709,7 +730,7 @@ function update(dt){
   else if(G.st==='retract'){
     G.tipY=lerp(G.retractY,0,smooth(0,0.32,G.rt)); G.tipX=lerp(G.retractX,G.aimX,smooth(0,0.32,G.rt));
     G.camK+= (0-G.camK)*clamp(dt*7,0,1); G.ts=1; G.sm=0;
-    if(G.rt>=0.34){G.st='aim'; G.tipX=G.aimX; G.passed=false; if(G.mode==='play') updateHud();}
+    if(G.rt>=0.34){G.st='aim'; G.tipX=G.aimX; G.passed=false; G.passedA=false; if(G.mode==='play') updateHud();}
   }
   G.baseX+=(G.tipX-G.baseX)*clamp(dt*2.5,0,1);
   G.flash=Math.max(0,G.flash-dt*3.5);
@@ -722,11 +743,13 @@ function update(dt){
   for(const s of G.streaks){s.x+=Math.sign(c.wind||0)*s.s*dt*(0.5+Math.abs(c.wind)/18)*G.ts; if(s.x>1.3)s.x=-0.3; if(s.x<-0.3)s.x=1.3;}
   for(const f of G.fluff){f.x+=Math.sign(c.wind||0)*f.s*dt*(0.3+Math.abs(c.wind)/30)*G.ts; if(f.x>1.1)f.x=-0.1; if(f.x<-0.1)f.x=1.1;}
 }
-function retract(){if(G.st!=='pass') G.passed=false; G.st='retract'; G.rt=0; G.retractY=G.tipY; G.retractX=G.tipX; G.bend=0; G.use={}; G.res&&(G.res.done=true);}
+function retract(){if(G.st!=='pass'){G.passed=false; G.passedA=false;} G.st='retract'; G.rt=0; G.retractY=G.tipY; G.retractX=G.tipX; G.bend=0; G.use={}; G.res&&(G.res.done=true);}
 
 /* ---------- draw ---------- */
 function camera(){
-  const c=G.cfg, nd=curNeedle(), np=needlePos(G.tw);
+  const c=G.cfg, nd=curNeedle(), nb=needlePos(G.tw);
+  const onA=c.twin&&!G.passedA&&(G.st==='aim'||G.st==='fly'||((G.st==='fail'||G.st==='whiff')&&G.res&&G.res.atA));
+  const np=onA?needleAPos(G.tw):nb;
   const spanX=2*c.A+2*Math.abs(c.offX)+90;
   const s0=Math.min(H*0.58/(c.D+50), W*0.86/spanX, 3.4);
   const c0x=c.offX*0.5, c0y=-c.D-(H*0.24-H/2)/s0;
@@ -738,7 +761,7 @@ function camera(){
   const ex=lerp(ex0,W/2,k), ey=lerp(ey0,H*0.46,k);
   let cx=np.x-(ex-W/2)/s, cy=np.y-(ey-H/2)/s;
   if(G.shakePx>0.3){cx+=(Math.random()-.5)*G.shakePx/s; cy+=(Math.random()-.5)*G.shakePx/s;}
-  return {s,cx,cy,np};
+  return {s,cx,cy,np:nb,focus:np};
 }
 function drawNeedle(x,y,nd){
   const E=nd.E,h=nd.h,L=300+E*3, xl=x-E/2-h*0.85, xr=x+L, r=h/2;
@@ -752,12 +775,11 @@ function drawNeedle(x,y,nd){
   ctx.fillStyle=g; ctx.fill('evenodd');
   ctx.lineWidth=Math.max(0.4,h*0.04); ctx.strokeStyle='rgba(18,27,49,.55)'; ctx.stroke();
 }
-function drawThread(s,layer,ny){
-  // layer 'front': the part on the viewer's side of the needle; 'back': the part that has gone through the eye
-  const throughEye=G.passed&&(G.st==='pass'||G.st==='retract');
-  if(layer==='back'&&!throughEye) return;
+function drawThread(s,top,bot,behind){
+  // draws only the part of the thread between y=top and y=bot; 'behind' parts have gone through an eye
+  const layer=behind?'back':'front', throughEye=behind||top>-1e4;
   ctx.save();
-  if(throughEye){ctx.beginPath(); if(layer==='back') ctx.rect(-1e5,-1e5,2e5,1e5+ny); else ctx.rect(-1e5,ny,2e5,1e5); ctx.clip();}
+  ctx.beginPath(); ctx.rect(-1e5,top,2e5,bot-top); ctx.clip();
   const th=curThread(), T=th.T, nd=curNeedle();
   const thin=!!visUse().hasami&&G.st!=='fail', Tt=T*0.5, cut=Math.min(36,Math.max(T*4,24));
   const tipX=G.tipX, tipY=G.tipY;
@@ -765,7 +787,8 @@ function drawThread(s,layer,ny){
   const w=G.cfg.wind||0, bow=w*1.4*(1+0.18*Math.sin(G.tw*9));   // wind bends the hanging thread
   let px=tipX, py=tipY;
   if(G.st==='fail'){px=tipX+G.bendDir*G.bend*T*1.6; py=tipY+G.bend*T*0.9;}
-  const straight=G.st==='pass'?(G.res.np.y+nd.h+30-tipY):Math.max(42,110/s);
+  const throughA=G.cfg.twin&&G.passedA&&G.st!=='aim';
+  const straight=throughA?(G.cfg.twin.DA*-1+nd.h+30-tipY):G.st==='pass'?(G.res.np.y+nd.h+30-tipY):Math.max(42,110/s);
   const sy=tipY+Math.max(42,straight);
   ctx.lineCap='round'; ctx.lineJoin='round';
   const path=()=>{ctx.beginPath();
@@ -808,9 +831,20 @@ function draw(){
   const tu=visUse(), thr=tu.itotoshi&&!(G.st==='pass'&&G.rt>0.6);
   const pull=G.st==='pass'?1-smooth(0.05,0.45,G.rt):1;
   if(thr) drawThreaderBack(cam.np,nd,cam.s);
-  drawThread(cam.s,'back',cam.np.y);
-  drawNeedle(cam.np.x,cam.np.y,nd);
-  drawThread(cam.s,'front',cam.np.y);
+  const thruB=G.passed&&(G.st==='pass'||G.st==='retract'), INF=1e5, yB=cam.np.y;
+  if(c.twin){
+    const a=needleAPos(G.tw), thruA=G.passedA&&G.st!=='aim';
+    if(thruB) drawThread(cam.s,-INF,yB,true);
+    drawNeedle(cam.np.x,yB,nd);
+    if(thruA) drawThread(cam.s,thruB?yB:-INF,a.y,true);
+    drawNeedle(a.x,a.y,nd);
+    if(aligned(G.tw)&&G.st==='aim'){ctx.strokeStyle='rgba(229,181,76,.55)'; ctx.lineWidth=1.5/cam.s; ctx.setLineDash([5/cam.s,5/cam.s]); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(cam.np.x,yB); ctx.stroke(); ctx.setLineDash([]);}
+    drawThread(cam.s,thruA?a.y:-INF,INF,false);
+  }else{
+    if(thruB) drawThread(cam.s,-INF,yB,true);
+    drawNeedle(cam.np.x,yB,nd);
+    drawThread(cam.s,thruB?yB:-INF,INF,false);
+  }
   if(thr) drawThreaderLoop(cam.np,nd,cam.s,tolOf(nd.E,curThread().T,tu)*pull);
   for(const p of G.snips){ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=curThread().color; const T0=curThread().T; ctx.fillRect(-T0/2,-2.5,T0,5); ctx.restore();}
   ctx.restore();
