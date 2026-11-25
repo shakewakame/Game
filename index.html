@@ -393,8 +393,8 @@ function stageCfg(n){
   return c;
 }
 const mod=(t,P)=>((t%P)+P)%P;
-function darkness(t){const d=G.cfg.dark; if(!d) return 0; const u=mod(t,d.P), s0=d.P-d.len; return smooth(s0,s0+0.12,u)*(1-smooth(d.P-0.1,d.P,u));}
-function flicker(t){const d=G.cfg.dark; if(!d) return 0; const u=mod(t,d.P), s0=d.P-d.len; return (u>s0-0.6&&u<s0)? (Math.sin(u*70)>0.3?0.5:0):0;}
+function darkness(t){const d=G.cfg.dark; if(!d) return 0; const u=mod(t,d.P), s0=d.P-d.len; return smooth(s0,s0+0.3,u)*(1-smooth(d.P-0.3,d.P,u));}
+function flicker(t){const d=G.cfg.dark; if(!d) return 0; const u=mod(t,d.P), s0=d.P-d.len, w=u-(s0-0.8); return (w>0&&u<s0)? 0.22*(0.5-0.5*Math.cos(2*Math.PI*w*2.5)):0;}   // three slow dips before the light goes out
 function catPunch(t){const c=G.cfg.cat; if(!c) return 0; const u=mod(t,c.P), s0=c.P-c.len; return u>s0? Math.sin(Math.PI*(u-s0)/c.len):0;}
 function catWarn(t){const c=G.cfg.cat; if(!c) return 0; const u=mod(t,c.P), s0=c.P-c.len; return smooth(s0-1.1,s0-0.6,u)*(1-smooth(c.P-0.05,c.P,u));}
 
@@ -782,7 +782,7 @@ function draw(){
   drawHand(cam,c);
   // night: the lamp goes out
   const dk=Math.max(darkness(G.tw),flicker(G.tw));
-  if(dk>0){ctx.fillStyle=`rgba(3,4,9,${0.93*dk})`; ctx.fillRect(0,0,W,H);}
+  if(dk>0){ctx.fillStyle=`rgba(3,4,9,${0.86*dk})`; ctx.fillRect(0,0,W,H);}
   drawDebug(cam,c);
   if(c.cat) drawCat(c,(G.tipY-cam.cy)*cam.s+H/2);
 
@@ -1183,25 +1183,14 @@ function drawHand(cam,c){
   const cold=c.ch.id==='snow', env=c.tremble?tremEnv(G.tw):0;
   let x=(G.tipX-cam.cx)*cam.s+W/2, y=(G.tipY-cam.cy)*cam.s+H/2+78;
   if(c.tremble){x+=c.tremble*env*2.2*Math.sin(G.tw*43)+c.tremble*env*1.2*Math.sin(G.tw*29+1); y+=c.tremble*env*1.2*Math.sin(G.tw*37);}
-  ctx.save(); ctx.globalAlpha=a; ctx.translate(x,y);
-  const skin=cold?'#f3d6d0':'#efc6a4', shade=cold?'#d3aeb0':'#d9a37e', line='rgba(70,35,25,.55)';
-  const cap=(x1,y1,x2,y2,w,col)=>{ctx.lineCap='round'; ctx.strokeStyle=line; ctx.lineWidth=w+3; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    ctx.strokeStyle=col; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();};
-  // sleeve, back of the hand, then the fingers pinching the thread at (0,0)
-  cap(78,76,150,150,44,cold?'#5a7fb0':'#3d5a8a');
-  ctx.fillStyle=line; ctx.beginPath(); ctx.ellipse(56,52,37,29,-0.75,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=skin; ctx.beginPath(); ctx.ellipse(56,52,35,27,-0.75,0,Math.PI*2); ctx.fill();
-  cap(66,30,34,20,15,shade);          // middle finger, curled behind
-  cap(58,10,4,-5,17,skin);            // index finger
-  cap(44,52,6,10,19,skin);            // thumb
-  ctx.fillStyle='rgba(255,255,255,.55)'; ctx.beginPath(); ctx.ellipse(2,-7,5,3.5,-0.3,0,Math.PI*2); ctx.fill();   // nail
+  if(!cold) return;
+  ctx.save(); ctx.globalAlpha=a; ctx.translate(x,y-70);
   if(cold){
-    ctx.fillStyle='rgba(225,70,85,.4)'; ctx.beginPath(); ctx.arc(2,-5,7,0,Math.PI*2); ctx.arc(8,12,7,0,Math.PI*2); ctx.fill();
     if(env>0.35){ // shiver marks
       ctx.globalAlpha=a*clamp((env-0.35)*2,0,1); ctx.strokeStyle='#cfe3ff'; ctx.lineWidth=2.5; ctx.lineCap='round';
       for(let i=0;i<2;i++){
         ctx.beginPath(); ctx.arc(-14-i*9,6,10+i*6,Math.PI-0.7,Math.PI+0.7); ctx.stroke();   // ((  left
-        ctx.beginPath(); ctx.arc(58+i*9,2,10+i*6,-0.7,0.7); ctx.stroke();                   // ))  right
+        ctx.beginPath(); ctx.arc(14+i*9,6,10+i*6,-0.7,0.7); ctx.stroke();                   // ))  right
       }
     }
   }
