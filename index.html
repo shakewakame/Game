@@ -107,6 +107,10 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
 .chip.live::before{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--beni);box-shadow:0 0 0 3px rgba(210,64,58,.3);animation:pulse 1.4s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(210,64,58,0)}}
 .stage-name{font-weight:900;font-size:1rem;text-shadow:0 2px 6px rgba(0,0,0,.5);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wind{align-self:flex-start;display:inline-flex;align-items:center;gap:.5rem;background:rgba(229,181,76,.16);color:var(--kin);border:2px dashed rgba(229,181,76,.5);
+  border-radius:12px;padding:.3rem .7rem;font-weight:900;font-size:1rem}
+.wind .arr{font-size:1.25rem;letter-spacing:-.15em;animation:gust .9s ease-in-out infinite}
+@keyframes gust{50%{transform:translateX(var(--gx,4px))}}
 .gear{font-size:.78rem;color:var(--sashiko);opacity:.9;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 .gear b{color:var(--kin)}
 .hud-bottom{display:flex;flex-direction:column;gap:.5rem;align-items:center}
@@ -155,13 +159,14 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
       </div>
       <div class="stage-name" id="hudStage"></div>
       <div class="gear" id="hudGear"></div>
+      <div class="wind" id="hudWind" hidden></div>
     </div>
     <div class="hud-bottom">
       <div class="hint" id="hint">画面をタップして糸を通す</div>
       <div class="tools">
         <button class="tool" id="tItotoshi" aria-pressed="false">糸通し <span class="n" id="nItotoshi">0</span></button>
         <button class="tool" id="tHasami" aria-pressed="false">糸切りばさみ <span class="n" id="nHasami">0</span></button>
-        <button class="tool ad" id="tAd">広告を見て +50</button>
+        <button class="tool ad" id="tAd">広告を見て +60</button>
       </div>
     </div>
   </div>
@@ -213,6 +218,7 @@ button:focus-visible{outline:3px solid var(--kin);outline-offset:3px}
       <div class="crown-badge" id="resCrown" hidden></div>
       <div class="lines" id="resLines"></div>
       <div class="res-btns">
+        <button class="btn gold wide" id="resDouble">広告を見て2倍にする</button>
         <button class="btn wide" id="resNext">次のステージへ</button>
         <button class="btn sub sm" id="resAgain">もう一回</button>
         <button class="btn sub sm" id="resList">ステージ一覧</button>
@@ -240,26 +246,29 @@ const $=id=>document.getElementById(id);
 const NEEDLES=[
   {id:'beads', name:'ビーズ針', E:6,  h:8,  price:0,    hard:true, desc:'ビーズを通すための極細の針。穴はとても小さい。上級者向け。'},
   {id:'meriken',name:'メリケン針',E:10, h:12, price:0,   desc:'いちばん普通の縫い針。明治時代にアメリカ（メリケン）から伝わったのが名前の由来。'},
-  {id:'shishu',name:'刺しゅう針',E:15, h:14, price:400, desc:'何本もの糸を通すため、穴が細長く大きく作られている。'},
-  {id:'toji',  name:'毛糸とじ針',E:24, h:22, price:1500,desc:'編み物をとじる太い針。先が丸く、穴がとても大きい。'},
+  {id:'shishu',name:'刺しゅう針',E:15, h:14, price:700, desc:'何本もの糸を通すため、穴が細長く大きく作られている。'},
+  {id:'toji',  name:'毛糸とじ針',E:24, h:22, price:2500,desc:'編み物をとじる太い針。先が丸く、穴がとても大きい。'},
 ];
 const THREADS=[
   {id:'keito', name:'毛糸（並太）',T:16, price:0,   hard:true, color:'#ecdcb8', fuzz:true, desc:'セーターを編む太い糸。普通の針にはまず入らない。毛糸とじ針なら……？'},
   {id:'tako',  name:'タコ糸',      T:9,  price:0,   hard:true, color:'#d9c49b', desc:'凧あげやチャーシューを縛る丈夫な木綿糸。'},
   {id:'shishuito',name:'刺しゅう糸（6本どり）',T:6,price:0,hard:true,color:'#e2558a',desc:'細い糸が6本より合わさった糸。刺しゅう針と相性が良い。'},
   {id:'tenui', name:'手縫い糸',    T:4,  price:0,   color:'#d2403a', desc:'ボタン付けや裾上げに使う普通の糸。'},
-  {id:'mishin',name:'ミシン糸（60番）',T:2.6,price:150,color:'#f3efe4',desc:'ミシン用の細い糸。「番手」の数字が大きいほど細くなる。'},
-  {id:'kinu',  name:'絹糸',        T:1.8,price:500, color:'#e9c46a', sheen:true, desc:'蚕のまゆから作る、細くてつややかな糸。'},
-  {id:'tegusu',name:'テグス（0.6号）',T:1.2,price:1200,color:'rgba(214,236,255,.8)',desc:'釣り糸にも使う透明なナイロン糸。ビーズ針と相性が良い。'},
+  {id:'mishin',name:'ミシン糸（60番）',T:2.6,price:300,color:'#f3efe4',desc:'ミシン用の細い糸。「番手」の数字が大きいほど細くなる。'},
+  {id:'kinu',  name:'絹糸',        T:1.8,price:1200, color:'#e9c46a', sheen:true, desc:'蚕のまゆから作る、細くてつややかな糸。'},
+  {id:'tegusu',name:'テグス（0.6号）',T:1.2,price:3000,color:'rgba(214,236,255,.8)',desc:'釣り糸にも使う透明なナイロン糸。ビーズ針と相性が良い。'},
 ];
 const COMPAT={'keito|toji':'毛糸とじ針','shishuito|shishu':'刺しゅう針','tenui|meriken':'メリケン針','tegusu|beads':'ビーズ針'};
 const TOOLS=[
-  {id:'itotoshi',name:'糸通し',price:40,desc:'針金の輪で糸を引き込む、昔ながらの道具。1回だけ穴が大きく使える。'},
-  {id:'hasami', name:'糸切りばさみ',price:15,desc:'糸の先を斜めに切りそろえると通しやすくなる。1回だけ糸が細くなる。'},
+  {id:'itotoshi',name:'糸通し',price:60,desc:'針金の輪で糸を引き込む、昔ながらの道具。1回だけ穴が大きく使える。'},
+  {id:'hasami', name:'糸切りばさみ',price:25,desc:'糸の先を斜めに切りそろえると通しやすくなる。1回だけ糸が細くなる。'},
 ];
 const DEFAULT_NEEDLE=NEEDLES[1], DEFAULT_THREAD=THREADS[3];
 const MM_PER_U=0.08;
-const REWARD={success:30, fail:5, first:50, compat:20, ad:50};
+// economy: one full clear earns ~4,500 coins; buying everything costs ~7,700, so ads and replays matter
+const REWARD={fail:3, compat:10, crown:20, ad:60};
+const successCoins=n=>10+n;      // stage 1: 11 … stage 30: 40
+const firstCoins=n=>20+n*4;      // stage 1: 24 … stage 30: 140
 
 /* ---------- stages ---------- */
 const CHAPTERS=[
@@ -271,6 +280,7 @@ const CHAPTERS=[
   {from:26,to:29,name:'船の上', sub:'ぜんぶ揺れる', tip:'船の上。針も糸も揺れる'},
   {from:30,to:30,name:'はるか彼方',sub:'最終ステージ', tip:'はるか彼方。穴は見えるか？'},
 ];
+function windLevel(){const w=Math.abs(G.cfg.wind); return w<12?1:w<22?2:w<30?3:4;}
 function chapterOf(n){return CHAPTERS.find(c=>n>=c.from&&n<=c.to)}
 function stageCfg(n){
   const ch=chapterOf(n), i=CHAPTERS.indexOf(ch);
@@ -328,7 +338,19 @@ function tone(t,dur,f1,f2,{type='sine',g=0.3}={}){
   const gn=a.createGain(); gn.gain.setValueAtTime(0,t); gn.gain.linearRampToValueAtTime(g,t+0.005); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur);
   o.connect(gn); gn.connect(master); o.start(t); o.stop(t+dur+0.05);
 }
+let droneG=null, droneO=null, droneHi=null;
+function drone(v){
+  if(!AC||!S.sound){return}
+  if(!droneG){
+    droneG=AC.createGain(); droneG.gain.value=0; const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=320;
+    droneO=AC.createOscillator(); droneO.type='sawtooth'; droneO.frequency.value=55; droneO.connect(lp); lp.connect(droneG);
+    droneHi=AC.createOscillator(); droneHi.type='sine'; droneHi.frequency.value=2600; const hg=AC.createGain(); hg.gain.value=0.05; droneHi.connect(hg); hg.connect(droneG);
+    droneG.connect(master); droneO.start(); droneHi.start();
+  }
+  const t=AC.currentTime; droneG.gain.setTargetAtTime(v*0.16,t,0.06); droneO.frequency.setTargetAtTime(55+v*30,t,0.1); droneHi.frequency.setTargetAtTime(2400+v*900,t,0.1);
+}
 const SFX={
+  slip(){if(!audio())return; const t=AC.currentTime; noise(t,0.35,{type:'highpass',f:3500,g:0.35,attack:0.04}); tone(t,0.5,880,1760,{g:0.12});},
   whoosh(){if(!audio())return; const t=AC.currentTime; noise(t,0.25,{f:700,q:0.8,g:0.25,attack:0.05});},
   heart(){if(!audio())return; const t=AC.currentTime; tone(t,0.14,70,45,{g:0.55}); tone(t+0.18,0.12,62,42,{g:0.35});},
   cracker(){if(!audio())return; const t=AC.currentTime;
@@ -368,7 +390,7 @@ window.addEventListener('resize',resize);
 /* ---------- game state ---------- */
 const G={mode:'menu',n:1,cfg:stageCfg(1),tw:0,ts:1,phase:0,aimX:0,tipX:0,tipY:0,baseX:0,flyX:0,drift:0,v:300,
   st:'aim',rt:0,camK:0,sm:0,bend:0,bendDir:1,res:null,armed:{itotoshi:false,hasami:false},use:{},
-  heartT:0,shakePx:0,lastJolt:-1,confetti:[],floats:[],streaks:[],demo:true,resultShown:false};
+  heartT:0,shakePx:0,pulse:0,flash:0,fanA:0,heartFx:[],focus:[],focusT:0,fluff:[],passed:false,lastJolt:-1,confetti:[],floats:[],streaks:[],demo:true,resultShown:false};
 
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const lerp=(a,b,t)=>a+(b-a)*t;
@@ -407,7 +429,8 @@ function startStage(n){
   $('hint').hidden=false;
 }
 function updateHud(){
-  const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n}　${c.ch.name}`+(c.wind?`　風 ${(c.wind>0?'→':'←').repeat(clamp(Math.round(Math.abs(c.wind)/12),1,3))}`:'');
+  const c=G.cfg; $('hudStage').textContent=`ステージ ${c.n}　${c.ch.name}`; const wl=windLevel(); const hw=$('hudWind'); hw.hidden=!c.wind;
+  if(c.wind){hw.innerHTML=`風 <span class="arr">${(c.wind>0?'➤':'◀').repeat(wl)}</span> ${['弱い','ふつう','強い','暴風'][wl-1]}`; hw.style.setProperty('--gx',(c.wind>0?5:-5)+'px');}
   const tries=(S.tries[c.n]||0)+1; $('hudTries').textContent=`挑戦 ${tries}回目`;
   const nd=curNeedle(), th=curThread();
   $('hudGear').innerHTML=`${nd.name} × ${th.name}`+(isCompat()?'　<b>相性◎</b>':'')+(th.T>nd.E*1.05?'　<b>太すぎ…？</b>':'');
@@ -435,22 +458,24 @@ function resolve(np){
   const sideMiss=dx< -(nd.E/2+nd.h*0.8+T/2);
   G.res={dx,tol,ok,np}; G.rt=0;
   if(ok){
-    G.st='pass'; G.relX=clamp(dx,-Math.max(0,(nd.E-T)/2),Math.max(0,(nd.E-T)/2));
+    G.st='pass'; G.relX=clamp(dx,-Math.max(0,(nd.E-T)/2),Math.max(0,(nd.E-T)/2)); G.passed=true;
+    if(!G.demo){G.flash=1; SFX.slip();}
   }else if(sideMiss){
     G.st='whiff'; if(!G.demo) SFX.whiff();
   }else{
-    G.st='fail'; G.tipY=np.y+nd.h/2+T*0.3; G.bend=0; G.bendDir=dx>=0?1:-1; if(!G.demo){SFX.boing(); vibrate(25);}
+    G.st='fail'; G.tipY=np.y; G.bend=0; G.bendDir=dx>=0?1:-1; if(!G.demo){SFX.boing(); vibrate(25);}
   }
 }
 function award(){
   const c=G.cfg, r=G.res, nd=curNeedle(), th=curThread();
   const lines=[]; let tot=0;
   if(r.ok){
-    lines.push(['成功ボーナス',REWARD.success]);
-    if(!S.cleared[c.n]){lines.push(['初クリア',REWARD.first]); S.cleared[c.n]=1;}
+    lines.push(['成功',successCoins(c.n)]);
+    if(!S.cleared[c.n]){lines.push(['初クリア',firstCoins(c.n)]); S.cleared[c.n]=1;}
     if(isCompat()) lines.push([`相性ボーナス（${th.name}×${nd.name}）`,REWARD.compat]);
     const bare=nd.E<=DEFAULT_NEEDLE.E&&th.T>=DEFAULT_THREAD.T&&!G.use.itotoshi&&!G.use.hasami;
     r.crown=bare; r.newCrown=bare&&!S.crowns[c.n]; if(bare) S.crowns[c.n]=1;
+    if(r.newCrown) lines.push(['王冠ボーナス',REWARD.crown]);
   }else lines.push(['チャレンジ参加賞',REWARD.fail]);
   lines.forEach(l=>tot+=l[1]); S.coins+=tot; save(); r.lines=lines; r.tot=tot;
   floatText(`+${tot}`,W/2,H*0.5,'#e5b54c'); SFX.coin(); refreshCoins();
@@ -464,6 +489,7 @@ function showResult(){
   if(r.crown){cb.hidden=false; cb.innerHTML=crownSvg(22)+(r.newCrown?' 素手クリア！王冠ゲット':' 素手クリア');} else cb.hidden=true;
   $('resLines').innerHTML=r.lines.map(([k,v])=>`<div><span>${k}</span><span class="coin">${v}</span></div>`).join('')+`<div class="tot"><span>合計</span><span class="coin">${r.tot}</span></div>`;
   $('resNext').hidden=c.n>=30; $('resNext').textContent=c.n>=30?'':'次のステージへ';
+  $('resDouble').hidden=false; $('resDouble').innerHTML=`広告を見て2倍にする（<span class="coin" style="color:inherit">+${r.tot}</span>）`;
   G.resultShown=true; show('result'); $('hud').hidden=true;
   if(c.n>=30) $('resTries').textContent+='　全ステージ制覇！';
 }
@@ -487,7 +513,8 @@ function burst(){
     }
   }
 }
-function makeStreaks(){G.streaks=[];for(let i=0;i<26;i++)G.streaks.push({x:Math.random(),y:Math.random(),l:0.05+Math.random()*0.1,s:0.6+Math.random()*0.8});}
+function makeStreaks(){G.streaks=[];for(let i=0;i<22;i++)G.streaks.push({x:Math.random(),y:Math.random(),l:0.05+Math.random()*0.1,s:0.6+Math.random()*0.8});
+  G.fluff=[];for(let i=0;i<10;i++)G.fluff.push({x:Math.random(),y:Math.random(),r:1.5+Math.random()*2.5,p:Math.random()*6,s:0.5+Math.random()*0.6});}
 
 /* ---------- update ---------- */
 function update(dt){
@@ -509,25 +536,27 @@ function update(dt){
     if(G.demo&&G.rt>1.2&&Math.abs(G.aimX-np.x)<2&&Math.random()<0.5) launch();
   }
   else if(G.st==='fly'){
-    const r=G.tipY-(np.y+nd.h/2);
-    const zone=Math.max(90,Math.min(c.D*0.55,520));
-    G.camK=smooth(zone,22,r);
-    G.sm=smooth(62,10,r); G.ts=1-0.88*G.sm;
+    // the thread runs in front of the needle and dives into the eye at the needle's centre line
+    const r=G.tipY-np.y;
+    const zone=Math.max(110,Math.min(c.D*0.55,520));
+    G.camK=smooth(zone,20,r);
+    G.sm=smooth(115,8,r); G.ts=1-0.94*G.sm;
     G.drift+=c.wind*dtw;
-    const vEff=Math.min(G.v,190+Math.max(r,0)*5);
+    const vEff=Math.min(G.v,150+Math.max(r,0)*4);
     G.tipY-=vEff*dtw;
     G.tipX=G.flyX+G.drift+trem(G.tw);
-    if(G.sm>0.35&&!G.demo){G.heartT-=dt; if(G.heartT<=0){SFX.heart(); G.heartT=0.62;}}
-    if(G.tipY<=np.y+nd.h/2) resolve(np);
+    if(G.sm>0.3&&!G.demo){G.heartT-=dt; if(G.heartT<=0){SFX.heart(); G.pulse=1; G.heartFx.push({t:0,side:G.heartFx.length%2}); G.heartT=lerp(0.75,0.34,G.sm);}}
+    if(G.tipY<=np.y) resolve(np);
   }
   else if(G.st==='pass'){
-    G.ts= G.rt<0.35?0.18: lerp(0.18,1,smooth(0.35,0.9,G.rt));
-    G.sm=1-smooth(0.3,1.0,G.rt);
+    // hit-stop, then a slow pull through the eye, then back to normal speed
+    G.ts= G.rt<0.14?0.0: G.rt<0.6?0.12: lerp(0.12,1,smooth(0.6,1.1,G.rt));
+    G.sm=1-smooth(0.5,1.2,G.rt);
     const target=np.y-80; G.tipY=Math.max(target,G.tipY-120*dtw*(1+G.rt*3));
     G.tipX=np.x+G.relX;
-    if(G.rt>=0.22&&!G.res.burst){G.res.burst=true; if(!G.demo){burst(); SFX.cracker(); SFX.applause(); vibrate([30,40,60]); award();}}
-    if(!G.demo&&G.rt>1.7&&!G.resultShown) showResult();
-    if(G.demo&&G.rt>2.2) retract();
+    if(G.rt>=0.5&&!G.res.burst){G.res.burst=true; if(!G.demo){burst(); SFX.cracker(); SFX.applause(); vibrate([30,40,60]); award();}}
+    if(!G.demo&&G.rt>2.0&&!G.resultShown) showResult();
+    if(G.demo&&G.rt>2.4) retract();
   }
   else if(G.st==='fail'||G.st==='whiff'){
     G.ts=lerp(G.ts,1,clamp(dt*5,0,1)); G.sm=Math.max(0,G.sm-dt*3);
@@ -548,17 +577,21 @@ function update(dt){
   else if(G.st==='retract'){
     G.tipY=lerp(G.retractY,0,smooth(0,0.32,G.rt)); G.tipX=lerp(G.retractX,G.aimX,smooth(0,0.32,G.rt));
     G.camK+= (0-G.camK)*clamp(dt*7,0,1); G.ts=1; G.sm=0;
-    if(G.rt>=0.34){G.st='aim'; G.tipX=G.aimX; if(G.mode==='play') updateHud();}
+    if(G.rt>=0.34){G.st='aim'; G.tipX=G.aimX; G.passed=false; if(G.mode==='play') updateHud();}
   }
   G.baseX+=(G.tipX-G.baseX)*clamp(dt*2.5,0,1);
+  G.pulse*=Math.exp(-dt*7); G.flash=Math.max(0,G.flash-dt*3.5); G.fanA+=dt*(4+Math.abs(c.wind)*0.5)*Math.sign(c.wind||1);
+  for(const h of G.heartFx) h.t+=dt; G.heartFx=G.heartFx.filter(h=>h.t<0.7);
+  drone(G.mode==='play'&&!G.demo&&G.st==='fly'?G.sm:0);
 
   // confetti & floats (real time)
   for(const p of G.confetti){p.vy+=1100*dt; p.vx*=Math.exp(-dt*1.6); p.vy*=Math.exp(-dt*1.2); p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.vr*dt; p.life-=dt;}
   G.confetti=G.confetti.filter(p=>p.life>0&&p.y<H+40);
   for(const f of G.floats) f.t+=dt; G.floats=G.floats.filter(f=>f.t<1.2);
-  for(const s of G.streaks){s.x+=Math.sign(c.wind||0)*s.s*dt*(0.25+Math.abs(c.wind)/40)*G.ts; if(s.x>1.2)s.x=-0.2; if(s.x<-0.2)s.x=1.2;}
+  for(const s of G.streaks){s.x+=Math.sign(c.wind||0)*s.s*dt*(0.5+Math.abs(c.wind)/18)*G.ts; if(s.x>1.3)s.x=-0.3; if(s.x<-0.3)s.x=1.3;}
+  for(const f of G.fluff){f.x+=Math.sign(c.wind||0)*f.s*dt*(0.3+Math.abs(c.wind)/30)*G.ts; if(f.x>1.1)f.x=-0.1; if(f.x<-0.1)f.x=1.1;}
 }
-function retract(){G.st='retract'; G.rt=0; G.retractY=G.tipY; G.retractX=G.tipX; G.bend=0; G.use={}; G.res&&(G.res.done=true);}
+function retract(){if(G.st!=='pass') G.passed=false; G.st='retract'; G.rt=0; G.retractY=G.tipY; G.retractX=G.tipX; G.bend=0; G.use={}; G.res&&(G.res.done=true);}
 
 /* ---------- draw ---------- */
 function camera(){
@@ -566,15 +599,15 @@ function camera(){
   const spanX=2*c.A+2*Math.abs(c.offX)+90;
   const s0=Math.min(H*0.58/(c.D+50), W*0.86/spanX, 3.4);
   const c0x=c.offX*0.5, c0y=-c.D-(H*0.24-H/2)/s0;
-  const s1=Math.min(W/(nd.E*3+64), 7.5);
+  const s1=Math.min(W/(nd.E*2.2+34), 11);
   const k=G.camK*G.camK*(3-2*G.camK);
-  const s=Math.exp(lerp(Math.log(s0),Math.log(s1),k));
+  const s=Math.exp(lerp(Math.log(s0),Math.log(s1),k))*(1+0.035*G.pulse*G.sm);
   // keep the eye on screen while zooming: move its screen position toward the centre
   const ex0=(np.x-c0x)*s0+W/2, ey0=(np.y-c0y)*s0+H/2;
   const ex=lerp(ex0,W/2,k), ey=lerp(ey0,H*0.46,k);
   let cx=np.x-(ex-W/2)/s, cy=np.y-(ey-H/2)/s;
   if(G.shakePx>0.3){cx+=(Math.random()-.5)*G.shakePx/s; cy+=(Math.random()-.5)*G.shakePx/s;}
-  return {s,cx,cy,np};
+  return {s,cx,cy,np,tilt:0.035*G.sm*Math.sign(c.offX||1)};
 }
 function drawNeedle(x,y,nd){
   const E=nd.E,h=nd.h,L=300+E*3, xl=x-E/2-h*0.85, xr=x+L, r=h/2;
@@ -588,10 +621,16 @@ function drawNeedle(x,y,nd){
   ctx.fillStyle=g; ctx.fill('evenodd');
   ctx.lineWidth=Math.max(0.4,h*0.04); ctx.strokeStyle='rgba(18,27,49,.55)'; ctx.stroke();
 }
-function drawThread(s){
+function drawThread(s,layer,ny){
+  // layer 'front': the part on the viewer's side of the needle; 'back': the part that has gone through the eye
+  const throughEye=G.passed&&(G.st==='pass'||G.st==='retract');
+  if(layer==='back'&&!throughEye) return;
+  ctx.save();
+  if(throughEye){ctx.beginPath(); if(layer==='back') ctx.rect(-1e5,-1e5,2e5,1e5+ny); else ctx.rect(-1e5,ny,2e5,1e5); ctx.clip();}
   const th=curThread(), T=effThread(), nd=curNeedle();
   const tipX=G.tipX, tipY=G.tipY;
   const baseY=tipY+Math.max(700,H/s*1.3);
+  const w=G.cfg.wind||0, bow=w*1.4*(1+0.18*Math.sin(G.tw*9));   // wind bends the hanging thread
   let px=tipX, py=tipY;
   if(G.st==='fail'){px=tipX+G.bendDir*G.bend*T*1.6; py=tipY+G.bend*T*0.9;}
   const straight=G.st==='pass'?(G.res.np.y+nd.h+30-tipY):42;
@@ -599,8 +638,10 @@ function drawThread(s){
   ctx.lineCap='round'; ctx.lineJoin='round';
   const path=()=>{ctx.beginPath(); ctx.moveTo(px,py);
     if(G.st==='fail') ctx.quadraticCurveTo(tipX,tipY+T*0.4,tipX,tipY+T*3);
-    ctx.lineTo(tipX,sy); ctx.bezierCurveTo(tipX,sy+(baseY-sy)*0.35,G.baseX,sy+(baseY-sy)*0.6,G.baseX,baseY);};
-  const lw=Math.max(T,1.3/s);
+    ctx.lineTo(tipX,sy); ctx.bezierCurveTo(tipX+bow*0.5,sy+(baseY-sy)*0.35,G.baseX+bow,sy+(baseY-sy)*0.6,G.baseX+bow*0.6,baseY);};
+  const lw=Math.max(T,1.3/s)*(layer==='back'?0.82:1);
+  if(layer==='front'&&throughEye){ // shadow of the thread on the needle
+    ctx.save(); ctx.translate(T*0.55,T*0.45); path(); ctx.strokeStyle='rgba(8,12,24,.35)'; ctx.lineWidth=lw*1.15; ctx.stroke(); ctx.restore();}
   if(th.fuzz){path(); ctx.strokeStyle='rgba(236,220,184,.28)'; ctx.lineWidth=lw*1.6; ctx.stroke();}
   path(); ctx.strokeStyle=th.color; ctx.lineWidth=lw; ctx.stroke();
   if(th.sheen||th.id==='tegusu'){path(); ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=lw*0.3; ctx.stroke();}
@@ -609,6 +650,8 @@ function drawThread(s){
     ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=Math.max(0.6/s,T*0.12);
     for(let yy=tipY+T*1.5; yy<sy; yy+=T*1.3){ctx.beginPath(); ctx.moveTo(tipX-T/2,yy); ctx.lineTo(tipX+T/2,yy-T*0.5); ctx.stroke();}
   }
+  if(layer==='back'){path(); ctx.strokeStyle='rgba(5,8,16,.38)'; ctx.lineWidth=lw; ctx.stroke();}  // farther away = darker
+  ctx.restore();
 }
 function draw(){
   ctx.setTransform(1,0,0,1,0,0);
@@ -618,16 +661,17 @@ function draw(){
   const c=G.cfg;
 
   // ambience
-  if(c.wind){ctx.strokeStyle='rgba(236,230,214,.12)'; ctx.lineWidth=1.5;
-    for(const st of G.streaks){const x=st.x*W,y=st.y*H; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-Math.sign(c.wind)*st.l*W,y); ctx.stroke();}}
+  if(c.wind) drawWind(c);
   if(c.bob){ctx.strokeStyle='rgba(127,166,255,.14)'; ctx.lineWidth=2;
     for(let j=0;j<4;j++){ctx.beginPath(); for(let x=0;x<=W;x+=12){const y=H*0.86+j*16+Math.sin(x*0.025+G.tw*1.5+j)*6; x?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();}}
 
+  if(G.sm>0.01){ctx.fillStyle=`rgba(5,8,16,${0.55*G.sm})`; ctx.fillRect(0,0,W,H);}   // dim the room
   const cam=camera(), nd=curNeedle();
   ctx.save();
-  ctx.translate(W/2,H/2); ctx.scale(cam.s,cam.s); ctx.translate(-cam.cx,-cam.cy);
-  drawThread(cam.s);
+  ctx.translate(W/2,H/2); ctx.rotate(cam.tilt); ctx.scale(cam.s,cam.s); ctx.translate(-cam.cx,-cam.cy);
+  drawThread(cam.s,'back',cam.np.y);
   drawNeedle(cam.np.x,cam.np.y,nd);
+  drawThread(cam.s,'front',cam.np.y);
   ctx.restore();
 
   // glint marker when the eye is tiny on screen
@@ -644,8 +688,14 @@ function draw(){
     const g=ctx.createRadialGradient(W/2,H*0.46,Math.min(W,H)*0.25,W/2,H*0.46,Math.max(W,H)*0.75);
     g.addColorStop(0,'rgba(5,8,16,0)'); g.addColorStop(1,`rgba(5,8,16,${0.7*G.sm})`);
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-    const bh=H*0.085*G.sm; ctx.fillStyle='#05080f'; ctx.fillRect(0,0,W,bh); ctx.fillRect(0,H-bh,W,bh);
+    drawFocusLines();
+    const bh=H*0.12*G.sm; ctx.fillStyle='#05080f'; ctx.fillRect(0,0,W,bh); ctx.fillRect(0,H-bh,W,bh);
+    // manga-style heartbeat text
+    ctx.textAlign='center'; ctx.font='900 34px "Zen Maru Gothic",system-ui,sans-serif';
+    for(const h of G.heartFx){const a=1-h.t/0.7; ctx.save(); ctx.globalAlpha=a*G.sm; ctx.translate(h.side?W*0.8:W*0.2,H*0.28+h.t*-20); ctx.rotate(h.side?0.2:-0.2); ctx.scale(1+h.t*0.6,1+h.t*0.6);
+      ctx.lineWidth=6; ctx.strokeStyle='#05080f'; ctx.strokeText('ドクン',0,0); ctx.fillStyle='#d2403a'; ctx.fillText('ドクン',0,0); ctx.restore();}
   }
+  if(G.flash>0){ctx.fillStyle=`rgba(255,250,235,${G.flash*0.75})`; ctx.fillRect(0,0,W,H);}
   // confetti
   for(const p of G.confetti){ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.scale(1,Math.abs(Math.cos(p.r*1.7))+0.15);
     ctx.globalAlpha=clamp(p.life,0,1); ctx.fillStyle=p.c; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();}
@@ -653,6 +703,36 @@ function draw(){
   ctx.textAlign='center'; ctx.font='900 30px "Zen Maru Gothic",system-ui,sans-serif';
   for(const f of G.floats){ctx.globalAlpha=1-f.t/1.2; ctx.fillStyle=f.color; ctx.fillText(f.text,f.x,f.y-f.t*60);}
   ctx.globalAlpha=1;
+}
+
+function drawFocusLines(){
+  // 集中線: radial speed lines pointing at the eye, re-drawn ~14 times a second
+  const now=performance.now();
+  if(now-G.focusT>70){G.focusT=now; G.focus=[]; for(let i=0;i<90;i++) G.focus.push({a:Math.random()*Math.PI*2,r:0.42+Math.random()*0.22,w:0.004+Math.random()*0.012});}
+  const cx=W/2, cy=H*0.46, R=Math.hypot(W,H)*0.75, rIn=Math.min(W,H);
+  ctx.fillStyle=`rgba(236,230,214,${0.5*G.sm})`;
+  for(const f of G.focus){const r0=f.r*rIn*(1.25-0.25*G.sm);
+    ctx.beginPath(); ctx.moveTo(cx+Math.cos(f.a)*r0,cy+Math.sin(f.a)*r0);
+    ctx.lineTo(cx+Math.cos(f.a-f.w)*R,cy+Math.sin(f.a-f.w)*R); ctx.lineTo(cx+Math.cos(f.a+f.w)*R,cy+Math.sin(f.a+f.w)*R); ctx.fill();}
+}
+function drawWind(c){
+  const dir=Math.sign(c.wind), lvl=windLevel(), a=1-0.6*G.sm;
+  // electric fan at the upwind edge
+  const fx=dir>0?-30:W+30, fy=H*0.66, fr=Math.min(110,W*0.26);
+  ctx.save(); ctx.globalAlpha=0.55*a; ctx.translate(fx,fy);
+  ctx.strokeStyle='#ece6d6'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,fr,0,Math.PI*2); ctx.stroke();
+  for(let i=0;i<12;i++){const t=i/12*Math.PI*2; ctx.beginPath(); ctx.moveTo(Math.cos(t)*fr*0.2,Math.sin(t)*fr*0.2); ctx.lineTo(Math.cos(t)*fr,Math.sin(t)*fr); ctx.lineWidth=1; ctx.stroke();}
+  ctx.rotate(G.fanA); ctx.fillStyle='rgba(127,166,255,.55)';
+  for(let i=0;i<3;i++){ctx.rotate(Math.PI*2/3); ctx.beginPath(); ctx.ellipse(fr*0.5,0,fr*0.42,fr*0.2,0.35,0,Math.PI*2); ctx.fill();}
+  ctx.fillStyle='#ece6d6'; ctx.beginPath(); ctx.arc(0,0,fr*0.13,0,Math.PI*2); ctx.fill(); ctx.restore();
+  // gust lines: wavy, longer and brighter when the wind is stronger
+  ctx.lineCap='round';
+  for(const st of G.streaks){const x=st.x*W, y=st.y*H, L=(0.08+lvl*0.05)*W*st.l*8;
+    ctx.strokeStyle=`rgba(236,230,214,${(0.18+lvl*0.07)*a})`; ctx.lineWidth=1.2+lvl*0.5;
+    ctx.beginPath(); for(let k=0;k<=8;k++){const xx=x-dir*L*k/8, yy=y+Math.sin(k*0.8+G.tw*6+st.y*20)*3*lvl; k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);} ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-dir*6,y-4); ctx.moveTo(x,y); ctx.lineTo(x-dir*6,y+4); ctx.stroke();}
+  // drifting lint (綿ぼこり)
+  for(const f of G.fluff){ctx.fillStyle=`rgba(236,230,214,${0.55*a})`; ctx.beginPath(); ctx.arc(f.x*W,f.y*H+Math.sin(G.tw*3+f.p)*10,f.r,0,Math.PI*2); ctx.fill();}
 }
 
 /* ---------- loop ---------- */
@@ -680,12 +760,15 @@ for(const k of ['itotoshi','hasami']){
 }
 $('tAd').onclick=()=>playAd(()=>updateHud());
 
-function playAd(done){
+function playAd(done,amount=REWARD.ad){
   audio(); const prev=[...document.querySelectorAll('.screen')].find(s=>!s.hidden);
   $('ad').hidden=false; let n=5; $('adCnt').textContent=n;
   const iv=setInterval(()=>{n--; $('adCnt').textContent=n; if(n<=0){clearInterval(iv); $('ad').hidden=true;
-    S.coins+=REWARD.ad; save(); refreshCoins(); SFX.coin(); toast(`+${REWARD.ad}コイン`,'広告を見てくれてありがとう',1.4); done&&done(); if(prev&&prev.id!=='ad') prev.hidden=false;}},1000);
+    S.coins+=amount; save(); refreshCoins(); SFX.coin(); toast(`+${amount}コイン`,'広告を見てくれてありがとう',1.4); done&&done(); if(prev&&prev.id!=='ad') prev.hidden=false;}},1000);
 }
+
+$('resDouble').onclick=()=>{const r=G.res; if(!r||r.doubled) return; r.doubled=true;
+  playAd(()=>{$('resDouble').hidden=true; $('resLines').insertAdjacentHTML('beforeend',`<div class="tot"><span>広告で2倍！</span><span class="coin">+${r.tot}</span></div>`);},r.tot);};
 
 /* title */
 $('goPlay').onclick=()=>{audio(); SFX.tap(); openStages();};
