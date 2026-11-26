@@ -217,11 +217,11 @@ const YOLKS={
   big:{name:'特大の黄身',color:'#f0a93a',n:1,fact:'ダチョウの黄身は、鶏の卵20個分以上の大きさがあります。'},
 };
 const EGGS=[
-  {id:'uzura',name:'うずらの卵',scale:0.62,pieces:30,shell:[233,222,200],spots:true,thick:[1,1.4],mem:1.2,sticky:.1,rank:0,
-   desc:'小さくて殻が薄い。まだら模様がかわいい。',yolks:[['normal',70],['orange',20],['twin',8],['triplet',2]]},
+  {id:'uzura',name:'うずらの卵',scale:0.62,pieces:30,shell:[233,222,200],spots:true,thick:[1,1.4],mem:.9,sticky:.1,rank:0,
+   desc:'小さくて、すぐ剥ける。まだら模様がかわいい。',yolks:[['normal',70],['orange',20],['twin',8],['triplet',2]]},
   {id:'tori',name:'鶏の卵',scale:1,pieces:48,shell:[226,188,150],thick:[1,2.2],mem:1,sticky:.14,rank:0,
    desc:'いちばん身近な卵。剥き方の基本はここで。',yolks:[['normal',60],['orange',18],['pale',14],['twin',7],['triplet',1]]},
-  {id:'ukokkei',name:'烏骨鶏の卵',scale:0.84,pieces:42,shell:[240,226,200],thick:[1,1.8],mem:1.45,sticky:.16,rank:1,
+  {id:'ukokkei',name:'烏骨鶏の卵',scale:0.84,pieces:42,shell:[240,226,200],thick:[1,1.8],mem:1.1,sticky:.16,rank:1,
    desc:'少し小ぶりで、薄皮がとても破れやすい。',yolks:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
   {id:'ahiru',name:'アヒルの卵',scale:1.15,pieces:56,shell:[220,232,224],thick:[1.4,2.8],mem:0.9,sticky:.18,rank:2,
    desc:'大きくて殻が硬め。針は何度か刺す必要あり。',yolks:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
@@ -232,6 +232,7 @@ const RANKS=[
   {name:'見習い',xp:0},{name:'一人前',xp:300},{name:'熟練',xp:900},{name:'名人',xp:2000},{name:'達人',xp:4000},
 ];
 // tool upgrades that come with each rank
+const SPOON_DMG=2.1, NEEDLE_DMG=.18, PEEL_FAIL=.75;   // membrane strain per action (the gauge is 100)
 const TOOLTIER=[   // what each craftsman rank does to the tools
   {spoon:'ステンレス',needle:'縫い針',tweezers:'ふつう',   spoonDmg:1,  needleDmg:1,  needleR:.26,peelDmg:1,  partial:.75},
   {spoon:'ステンレス',needle:'細い針',tweezers:'ふつう',   spoonDmg:1,  needleDmg:.6, needleR:.28,peelDmg:1,  partial:.75},
@@ -281,6 +282,7 @@ const SFX={
   bad(){if(!audio())return; const t=AC.currentTime; tn(t,.18,320,160,{type:'sawtooth',g:.07}); nz(t,.12,{type:'lowpass',f:500,g:.15});},
   tear(){if(!audio())return; const t=AC.currentTime; nz(t,.5,{type:'lowpass',f:700,f2:200,g:.4,a:.03}); tn(t,.4,200,70,{g:.25});},
   done(){if(!audio())return; const t=AC.currentTime; [523,659,784,1047].forEach((f,i)=>tn(t+i*.09,.35,f,f,{type:'triangle',g:.14})); for(let i=0;i<40;i++) nz(t+.35+Math.random()*1.6,.04,{f:1200+Math.random()*1500,q:1.3,g:.12*(1-i/40)});},
+  lucky(){if(!audio())return; const t=AC.currentTime; nz(t,.25,{type:'highpass',f:1800,g:.5}); [784,988,1175,1568].forEach((f,i)=>tn(t+.05+i*.06,.3,f,f*1.01,{type:'triangle',g:.14}));},
   wobble(){if(!audio())return; const t=AC.currentTime; tn(t,.5,180,110,{g:.18}); tn(t+.1,.4,150,95,{g:.12});},
 };
 function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
@@ -370,7 +372,7 @@ function buildEgg(E,seed,opts={}){
 
 /* ---------- materials ---------- */
 const shellMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.62,metalness:0});
-const shellLift=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.45,metalness:0,emissive:new THREE.Color('#fff4e0'),emissiveIntensity:.1});
+const shellLift=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:0,emissive:new THREE.Color('#ffc65a'),emissiveIntensity:.4});
 const stickyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:0,emissive:new THREE.Color('#6b3a10'),emissiveIntensity:.35});
 const keepMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.1,emissive:new THREE.Color('#f2b632'),emissiveIntensity:.45});
 const crackMat=new THREE.LineBasicMaterial({color:'#2a1d14'});
@@ -379,7 +381,7 @@ const whiteMat=new THREE.MeshStandardMaterial({color:'#fff6e6',roughness:.15,tra
 const dmgMat=new THREE.MeshBasicMaterial({color:'#b58f6a',transparent:true,opacity:.35,depthWrite:false});
 
 /* ---------- game state ---------- */
-const G={mode:'menu',egg:null,tool:'spoon',dmg:0,t:0,running:false,lastPeel:-9,combo:0,removedArea:0,done:false,failed:false,slow:false,bonus:0,
+const G={flash:0,mode:'menu',egg:null,tool:'spoon',dmg:0,t:0,running:false,lastPeel:-9,combo:0,removedArea:0,done:false,failed:false,slow:false,bonus:0,
   kind:'free',daily:null,art:null,zoom:1,jiggle:0,flakes:[],crackLines:null,dmgMarks:[],yolks:[],finishT:0,spin:0};
 
 function clearEgg(){ if(eggGroup){root.remove(eggGroup); eggGroup.traverse(o=>{if(o.geometry&&o.geometry!==MEMBRANE_GEO) o.geometry.dispose();});} eggGroup=null; G.flakes.forEach(f=>scene.remove(f.m)); G.flakes=[]; }
@@ -427,7 +429,7 @@ function refreshCracks(){
   }
   G.crackLines.geometry.dispose(); const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); G.crackLines.geometry=g;
   // pieces whose every edge is cracked lift a little: they are ready to come off
-  for(const p of egg.pieces){ if(p.removed) continue; const f=isFree(p)||crackedShare(p)>=tier().partial; const lift=f?.012:0; p.mesh.position.copy(p.dir).multiplyScalar(lift);
+  for(const p of egg.pieces){ if(p.removed) continue; const f=isFree(p)||crackedShare(p)>=tier().partial; const lift=f?.035:0; p.mesh.position.copy(p.dir).multiplyScalar(lift);
     p.mesh.material=p.keep?keepMat:(p.stickyKnown?stickyMat:(f?shellLift:shellMat));}
 }
 function crackedShare(p){let c=0,n=0; for(const pr of p.nbr){const other=G.egg.pieces[pr.a===p.i?pr.b:pr.a]; if(other.removed) continue; n++; if(pr.cracked) c++;} return n?c/n:1;}
@@ -438,12 +440,17 @@ const tmpV=new THREE.Vector3();
 function hitAt(p,dir){
   const T=tier(), E=G.egg.E, isSpoon=G.tool==='spoon';
   const R=isSpoon?.46:T.needleR, power=isSpoon?3:2;
-  let cracks=0, hard=0, thinnest=9;
-  for(const pr of G.egg.pairs){ if(pr.cracked) continue; if(pr.mid.dot(dir)<Math.cos(R)) continue;
+  let cracks=0, hard=0, thinnest=9, near=0, already=0;
+  for(const pr of G.egg.pairs){ if(pr.mid.dot(dir)<Math.cos(R)) continue; near++; if(pr.cracked){already++; continue;}
     if(G.egg.pieces[pr.a].removed&&G.egg.pieces[pr.b].removed) continue;
     thinnest=Math.min(thinnest,pr.maxhp); pr.hp-=power; if(pr.hp<=0){pr.cracked=true; cracks++;} else hard++;}
   // membrane strain: spoon much more than needle; thin shell and a weak membrane make it worse; the air cell cushions it
-  let d=(isSpoon?5:.25)*(isSpoon?T.spoonDmg:T.needleDmg)*E.mem*(thinnest<=1?1.3:thinnest>=3?.75:1);
+  // hidden bonus: once in a while the spoon lands just right and a whole area shatters with no strain at all
+  if(isSpoon&&G.egg.rng()<.06){ for(const pr of G.egg.pairs){ if(!pr.cracked&&pr.mid.dot(dir)>Math.cos(.95)){pr.cracked=true; pr.hp=0;} }
+    G.bonus+=60; G.flash=1; SFX.lucky(); buzz([20,30,20,30,60]); toast('会心の一撃！','殻が一気に割れた！',1.6); refreshCracks(); updateHud(); return; }
+  let d=(isSpoon?SPOON_DMG:NEEDLE_DMG)*(isSpoon?T.spoonDmg:T.needleDmg)*E.mem*(thinnest<=1?1.3:thinnest>=3?.75:1);
+  // a spoon on shell that is already broken hits the membrane directly: rough work early, needle work late
+  if(isSpoon&&near) d*=1+2.2*(already/near);
   if(p.air) d*=.2;
   addDamage(d,dir,isSpoon);
   if(isSpoon) SFX.spoon(cracks); else SFX.needle(cracks);
@@ -454,12 +461,18 @@ function hitAt(p,dir){
 }
 function peelAttempt(p){
   const T=tier(), s=crackedShare(p), mem=G.egg.E.mem;
-  if(isFree(p)){removePiece(p); return;}
-  if(s>=T.partial){removePiece(p); addDamage(1.2*T.peelDmg*mem,p.dir,false); return;}   // mostly cracked: it comes off, with a little tug on the membrane
-  addDamage((1.5+2.5*(1-s))*T.peelDmg*mem,p.dir,false); SFX.bad(); buzz([10,30,10]);
+  if(isFree(p)){removePiece(p);
+    if(G.egg.rng()<.07){const chain=p.nbr.map(pr=>G.egg.pieces[pr.a===p.i?pr.b:pr.a]).filter(q=>!q.removed&&!q.keep&&crackedShare(q)>=.5);
+      if(chain.length>=2){chain.forEach(q=>removePiece(q,true)); G.bonus+=40; SFX.lucky(); buzz([20,30,60]); toast('ズルッと一気に！',`${chain.length+1}枚まとめて剥けた`,1.5);}}
+    return;}
+  if(s>=T.partial){removePiece(p); addDamage(.8*T.peelDmg*mem,p.dir,false); return;}
+  // tapped a piece that is still held? take a ready neighbour instead, if there is one
+  const ready=p.nbr.map(pr=>G.egg.pieces[pr.a===p.i?pr.b:pr.a]).find(q=>!q.removed&&!q.keep&&(isFree(q)||crackedShare(q)>=T.partial));
+  if(ready&&G.kind!=='art'){peelAttempt(ready); return;}   // mostly cracked: it comes off, with a little tug on the membrane
+  addDamage((1.5+2.5*(1-s))*PEEL_FAIL*T.peelDmg*mem,p.dir,false); SFX.bad(); buzz([10,30,10]);
   toast('まだつながってる','まわりにひびを入れてから',1.2); updateHud();
 }
-function removePiece(p){
+function removePiece(p,quiet){
   const now=G.t; p.removed=true; G.removedArea+=p.area;
   // the piece flies off as a flake
   const m=p.mesh; const wp=new THREE.Vector3(); m.getWorldPosition(wp); scene.attach(m); m.material=m.material.clone(); m.material.transparent=true;
@@ -468,7 +481,7 @@ function removePiece(p){
   // combos and big pieces
   if(now-G.lastPeel<1.6){G.combo++; if(G.combo>=3){SFX.combo(G.combo); G.bonus+=G.combo*4; floatTxt(`${G.combo} 連続！`);}} else G.combo=1;
   G.lastPeel=now;
-  if(p.big){SFX.peel(true); G.bonus+=25; toast('大物！','大きな一枚がきれいに剥けた',1.1); buzz(25);} else SFX.peel(false);
+  if(quiet){} else if(p.big){SFX.peel(true); G.bonus+=25; toast('大物！','大きな一枚がきれいに剥けた',1.1); buzz(25);} else SFX.peel(false);
   if(G.kind==='art'&&p.keep){addDamage(0,p.dir,false); toast('あっ、残す部分！','金色の部分は残してね',1.3);}
   refreshCracks(); updateHud();
   const left=G.egg.pieces.filter(q=>!q.removed&&!(G.kind==='art'&&q.keep)).length;
@@ -555,6 +568,8 @@ function updateHud(){
   if(!G.egg) return;
   const pct=Math.round(G.removedArea/G.egg.total*100);
   $('hDmg').style.width=G.dmg+'%'; $('hGauge').classList.toggle('hot',G.dmg>75);
+  const ready=G.egg.pieces.filter(p=>!p.removed&&!p.keep&&(isFree(p)||crackedShare(p)>=tier().partial)).length;
+  $('hHint').textContent=ready?`光っている破片 ${ready}枚 → ピンセットで剥がせる`:'ドラッグで回転 ・ ピンチで拡大';
   if(G.kind==='art'){const a=artScore(); $('hPct').textContent=`形 ${Math.round((a.keep*.6+a.rem*.4)*100)}%`;} else $('hPct').textContent=`剥けた ${pct}%`;
   const T=tier(); $('tnSpoon').textContent=T.spoon; $('tnNeedle').textContent=T.needle; $('tnTweezers').textContent=T.tweezers;
 }
@@ -611,6 +626,8 @@ function frame(now){
   const rdt=Math.min(.05,(now-last)/1000); last=now;
   const W=canvas.clientWidth,H=canvas.clientHeight; if(canvas.width!==Math.floor(W*renderer.getPixelRatio())||canvas.height!==Math.floor(H*renderer.getPixelRatio())){renderer.setSize(W,H,false); camera.aspect=W/H; camera.updateProjectionMatrix();}
   if(G.running){G.t+=rdt; $('hTime').textContent=fmtT(G.t);}
+  shellLift.emissiveIntensity=G.tool==='tweezers'?.45+.2*Math.sin(now/180):.4;
+  if(G.flash>0){G.flash=Math.max(0,G.flash-rdt*2.5); renderer.toneMappingExposure=1.05+G.flash*.8;}
   // idle spin on menus
   if(G.mode!=='play'&&eggGroup) root.rotateOnWorldAxis(new THREE.Vector3(0,1,0),rdt*.35);
   // last piece: everything eases in
