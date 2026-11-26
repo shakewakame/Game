@@ -3,7 +3,7 @@ name: Android build
 on:
   push:
     branches: ['**']
-    paths-ignore: ['README.md', 'store/**', 'docs/**']
+    paths-ignore: ['README.md', 'store/**', 'docs/**', 'egg/**']
   workflow_dispatch:
 
 jobs:
