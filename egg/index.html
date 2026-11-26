@@ -116,6 +116,12 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
 .zi{width:64px;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-size:.6rem;color:var(--muted);text-align:center;line-height:1.3}
 .zi .yk{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-weight:900;color:rgba(255,255,255,.3)}
 .note{font-size:.78rem;color:var(--muted);line-height:1.6}
+.helpcards{display:flex;flex-direction:column;gap:.6rem}
+.hc{background:rgba(251,246,236,.07);border-radius:14px;padding:.75rem .9rem}
+.hc b{color:var(--yolk);font-size:1rem}
+.hc p{margin:.25rem 0 0;font-size:.88rem;line-height:1.65}
+.hc em{font-style:normal;font-weight:700;color:#ffe3a1}
+#help{justify-content:center;background:rgba(22,16,12,.94)}
 @media (prefers-reduced-motion:reduce){.gauge.hot{animation:none}}
 </style>
 
@@ -127,6 +133,7 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
       <div class="toprow">
         <button class="chip" id="hBack">← やめる</button>
         <span class="chip" id="hName">鶏の卵</span>
+        <button class="chip" id="hHelp">？ 遊び方</button>
         <span class="chip" id="hTime">0:00</span>
       </div>
       <div class="gauge" id="hGauge">薄皮 <span class="g"><i id="hDmg"></i></span> <span id="hPct">剥けた 0%</span></div>
@@ -168,6 +175,18 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
     <div class="zk" id="zList"></div>
   </section>
 
+  <section class="screen" id="help" hidden>
+    <div class="bar"><span></span><h2>遊び方</h2><span></span></div>
+    <div class="helpcards">
+      <div class="hc"><b>スプーン</b><p>コツンと叩くと、<em>広い範囲</em>にひびが入る。殻を一気に割りたいときに。そのぶん薄皮に負担がかかるので、使いすぎ注意。</p></div>
+      <div class="hc"><b>針</b><p>チクッと刺すと、刺したまわりにひびが入る。<em>薄皮をほとんど傷めない</em>ので、基本はこれ。厚いところは何度か刺す。</p></div>
+      <div class="hc"><b>ピンセット</b><p>まわりがひび割れて、<em>少し浮いて明るくなった破片</em>をタップすると剥がれる。つながっている破片を引っぱると薄皮が傷む。</p></div>
+      <div class="hc"><b>薄皮ゲージ</b><p>満タンになると薄皮が破れて失敗。スプーンを控えめに、針でこまめにひびを入れよう。</p></div>
+      <div class="hc"><b>コツ</b><p>丸い方の端（下）には<em>気室</em>という空気の部屋があり、剥きやすい。大きな破片は「大物」、テンポよく剥くと「連続」でボーナス。</p></div>
+    </div>
+    <button class="btn" id="helpClose">続ける</button>
+  </section>
+
   <section class="screen" id="result" hidden>
     <div class="res">
       <h2 id="rTitle">はだかになった！</h2>
@@ -198,27 +217,27 @@ const YOLKS={
   big:{name:'特大の黄身',color:'#f0a93a',n:1,fact:'ダチョウの黄身は、鶏の卵20個分以上の大きさがあります。'},
 };
 const EGGS=[
-  {id:'uzura',name:'うずらの卵',scale:0.62,pieces:34,shell:[233,222,200],spots:true,thick:[1,1.4],mem:1.2,sticky:.1,rank:0,
+  {id:'uzura',name:'うずらの卵',scale:0.62,pieces:30,shell:[233,222,200],spots:true,thick:[1,1.4],mem:1.2,sticky:.1,rank:0,
    desc:'小さくて殻が薄い。まだら模様がかわいい。',yolks:[['normal',70],['orange',20],['twin',8],['triplet',2]]},
-  {id:'tori',name:'鶏の卵',scale:1,pieces:56,shell:[226,188,150],thick:[1,2.2],mem:1,sticky:.14,rank:0,
+  {id:'tori',name:'鶏の卵',scale:1,pieces:48,shell:[226,188,150],thick:[1,2.2],mem:1,sticky:.14,rank:0,
    desc:'いちばん身近な卵。剥き方の基本はここで。',yolks:[['normal',60],['orange',18],['pale',14],['twin',7],['triplet',1]]},
-  {id:'ukokkei',name:'烏骨鶏の卵',scale:0.84,pieces:46,shell:[240,226,200],thick:[1,1.8],mem:1.45,sticky:.16,rank:1,
+  {id:'ukokkei',name:'烏骨鶏の卵',scale:0.84,pieces:42,shell:[240,226,200],thick:[1,1.8],mem:1.45,sticky:.16,rank:1,
    desc:'少し小ぶりで、薄皮がとても破れやすい。',yolks:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
-  {id:'ahiru',name:'アヒルの卵',scale:1.15,pieces:64,shell:[220,232,224],thick:[1.4,2.8],mem:0.9,sticky:.18,rank:2,
+  {id:'ahiru',name:'アヒルの卵',scale:1.15,pieces:56,shell:[220,232,224],thick:[1.4,2.8],mem:0.9,sticky:.18,rank:2,
    desc:'大きくて殻が硬め。針は何度か刺す必要あり。',yolks:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
-  {id:'dachou',name:'ダチョウの卵',scale:1.9,pieces:88,shell:[240,232,212],pores:true,thick:[2.2,3.8],mem:0.8,sticky:.24,rank:3,
+  {id:'dachou',name:'ダチョウの卵',scale:1.9,pieces:76,shell:[240,232,212],pores:true,thick:[2.2,3.8],mem:0.8,sticky:.24,rank:3,
    desc:'世界一大きな卵。殻が分厚く、スプーンの出番。',yolks:[['big',90],['twin',10]]},
 ];
 const RANKS=[
   {name:'見習い',xp:0},{name:'一人前',xp:300},{name:'熟練',xp:900},{name:'名人',xp:2000},{name:'達人',xp:4000},
 ];
 // tool upgrades that come with each rank
-const TOOLTIER=[
-  {spoon:'ステンレス',needle:'縫い針',tweezers:'ふつう', spoonDmg:1,needleDmg:1,hold:.45,peelDmg:1},
-  {spoon:'ステンレス',needle:'細い針',tweezers:'ふつう', spoonDmg:1,needleDmg:.6,hold:.45,peelDmg:1},
-  {spoon:'ステンレス',needle:'細い針',tweezers:'精密',  spoonDmg:1,needleDmg:.6,hold:.25,peelDmg:.5},
-  {spoon:'木のさじ', needle:'細い針',tweezers:'精密',  spoonDmg:.7,needleDmg:.6,hold:.25,peelDmg:.5},
-  {spoon:'金のさじ', needle:'金の針',tweezers:'金の精密',spoonDmg:.6,needleDmg:.5,hold:.2,peelDmg:.4},
+const TOOLTIER=[   // what each craftsman rank does to the tools
+  {spoon:'ステンレス',needle:'縫い針',tweezers:'ふつう',   spoonDmg:1,  needleDmg:1,  needleR:.26,peelDmg:1,  partial:.75},
+  {spoon:'ステンレス',needle:'細い針',tweezers:'ふつう',   spoonDmg:1,  needleDmg:.6, needleR:.28,peelDmg:1,  partial:.75},
+  {spoon:'ステンレス',needle:'細い針',tweezers:'精密',     spoonDmg:1,  needleDmg:.6, needleR:.28,peelDmg:.5, partial:.5},
+  {spoon:'木のさじ', needle:'細い針',tweezers:'精密',     spoonDmg:.7, needleDmg:.6, needleR:.28,peelDmg:.5, partial:.5},
+  {spoon:'金のさじ', needle:'金の針',tweezers:'金の精密', spoonDmg:.6, needleDmg:.5, needleR:.31,peelDmg:.4, partial:.4},
 ];
 const ARTS=[
   {id:'heart',name:'ハート',desc:'正面にハートを残して、ほかを全部剥く。'},
@@ -344,7 +363,6 @@ function buildEgg(E,seed,opts={}){
     pieces.push({i,geo,dir:cen,area:counts[i],big:counts[i]>mean*1.45,removed:false,sticky:false,stickyKnown:false,air:cen.y<-0.8,keep:false,mesh:null,nbr:[]});
   }
   for(const pr of PAIRS){pieces[pr.a].nbr.push(pr); pieces[pr.b].nbr.push(pr);}
-  for(const p of pieces) if(!p.air&&rng()<E.sticky) p.sticky=true;
   // what is inside (decided now, seen only at the end)
   let tot=0; for(const [,w] of E.yolks) tot+=w; let r=rng()*tot, yolk=E.yolks[0][0]; for(const [k,w] of E.yolks){if((r-=w)<0){yolk=k;break;}}
   return {E,seeds,pieces,pairs:PAIRS,total:F,yolk,rng};
@@ -392,7 +410,7 @@ function startEgg(E,seed,kind='free',extra={}){
   $('finishArt').style.display=kind==='art'?'inline-block':'none';
   $('hGoal').textContent=kind==='art'?`お題：${G.art.name}　金色の部分を残して、ほかを全部剥く`:kind==='daily'?`今日の卵（${G.daily}）`:'殻を全部剥いて、はだかの卵に';
   $('hName').textContent=E.name;
-  if(!S.tips){tipTour(); S.tips=true; save();}
+  if(!S.tips){S.tips=true; save(); G.running=false; $('help').hidden=false;}
 }
 
 // distance that fits the whole egg on any screen shape, leaving room for the HUD above and below
@@ -409,7 +427,7 @@ function refreshCracks(){
   }
   G.crackLines.geometry.dispose(); const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); G.crackLines.geometry=g;
   // pieces whose every edge is cracked lift a little: they are ready to come off
-  for(const p of egg.pieces){ if(p.removed) continue; const f=isFree(p); const lift=f?.012:0; p.mesh.position.copy(p.dir).multiplyScalar(lift);
+  for(const p of egg.pieces){ if(p.removed) continue; const f=isFree(p)||crackedShare(p)>=tier().partial; const lift=f?.012:0; p.mesh.position.copy(p.dir).multiplyScalar(lift);
     p.mesh.material=p.keep?keepMat:(p.stickyKnown?stickyMat:(f?shellLift:shellMat));}
 }
 function crackedShare(p){let c=0,n=0; for(const pr of p.nbr){const other=G.egg.pieces[pr.a===p.i?pr.b:pr.a]; if(other.removed) continue; n++; if(pr.cracked) c++;} return n?c/n:1;}
@@ -419,13 +437,13 @@ function isFree(p){const s=crackedShare(p); return p.air?s>=.5:s>=1;}
 const tmpV=new THREE.Vector3();
 function hitAt(p,dir){
   const T=tier(), E=G.egg.E, isSpoon=G.tool==='spoon';
-  const R=isSpoon?.46:.13, power=isSpoon?2:1;
+  const R=isSpoon?.46:T.needleR, power=isSpoon?3:2;
   let cracks=0, hard=0, thinnest=9;
   for(const pr of G.egg.pairs){ if(pr.cracked) continue; if(pr.mid.dot(dir)<Math.cos(R)) continue;
     if(G.egg.pieces[pr.a].removed&&G.egg.pieces[pr.b].removed) continue;
     thinnest=Math.min(thinnest,pr.maxhp); pr.hp-=power; if(pr.hp<=0){pr.cracked=true; cracks++;} else hard++;}
   // membrane strain: spoon much more than needle; thin shell and a weak membrane make it worse; the air cell cushions it
-  let d=(isSpoon?7:1.1)*(isSpoon?T.spoonDmg:T.needleDmg)*E.mem*(thinnest<=1?1.3:thinnest>=3?.75:1);
+  let d=(isSpoon?5:.25)*(isSpoon?T.spoonDmg:T.needleDmg)*E.mem*(thinnest<=1?1.3:thinnest>=3?.75:1);
   if(p.air) d*=.2;
   addDamage(d,dir,isSpoon);
   if(isSpoon) SFX.spoon(cracks); else SFX.needle(cracks);
@@ -434,13 +452,11 @@ function hitAt(p,dir){
   if(p.air&&!G.seenAir){G.seenAir=true; toast('気室！','丸い方の端には空気の部屋。ここは剥きやすい',1.8);}
   refreshCracks(); updateHud();
 }
-function peelAttempt(p,long){
-  const T=tier();
-  if(isFree(p)){
-    if(p.sticky&&!long){p.stickyKnown=true; addDamage(2.5*T.peelDmg*G.egg.E.mem,p.dir,false); SFX.bad(); toast('貼りついてる！','長押しで、ゆっくり剥がそう',1.4); refreshCracks(); return;}
-    removePiece(p); return;
-  }
-  const s=crackedShare(p); addDamage((2+5*(1-s))*T.peelDmg*G.egg.E.mem,p.dir,false); SFX.bad(); buzz([10,30,10]);
+function peelAttempt(p){
+  const T=tier(), s=crackedShare(p), mem=G.egg.E.mem;
+  if(isFree(p)){removePiece(p); return;}
+  if(s>=T.partial){removePiece(p); addDamage(1.2*T.peelDmg*mem,p.dir,false); return;}   // mostly cracked: it comes off, with a little tug on the membrane
+  addDamage((1.5+2.5*(1-s))*T.peelDmg*mem,p.dir,false); SFX.bad(); buzz([10,30,10]);
   toast('まだつながってる','まわりにひびを入れてから',1.2); updateHud();
 }
 function removePiece(p){
@@ -543,7 +559,10 @@ function updateHud(){
   const T=tier(); $('tnSpoon').textContent=T.spoon; $('tnNeedle').textContent=T.needle; $('tnTweezers').textContent=T.tweezers;
 }
 function setTool(t){G.tool=t; document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t?'true':'false'));}
-document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{audio(); setTool(b.dataset.tool); SFX.needle(0);});
+const TOOLTIP={spoon:['スプーン','広く割れる。薄皮への負担は大きい'],needle:['針','狭く割れる。薄皮にやさしい'],tweezers:['ピンセット','浮いて明るい破片をタップ']};
+document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{audio(); setTool(b.dataset.tool); SFX.needle(0); const t=TOOLTIP[b.dataset.tool]; toast(t[0],t[1],1.1);});
+$('hHelp').onclick=()=>{G.running=false; $('help').hidden=false;};
+$('helpClose').onclick=()=>{$('help').hidden=true; if(G.egg&&!G.done) G.running=true;};
 
 let toastT=null;
 function toast(big,small,dur=1.2){$('tBig').textContent=big; $('tSmall').textContent=small||''; $('toast').style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>$('toast').style.opacity=0,dur*1000);}
@@ -567,7 +586,6 @@ canvas.addEventListener('pointerdown',e=>{
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size===2){const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); zoom0=G.zoom; down=null; clearTimeout(holdTimer); return;}
   down={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now(),moved:false,held:false};
-  if(G.tool==='tweezers'){clearTimeout(holdTimer); holdTimer=setTimeout(()=>{ if(!down||down.moved) return; const h=pick(down.x,down.y); if(h){down.held=true; peelAttempt(h.piece,true);} },tier().hold*1000);}
 });
 canvas.addEventListener('pointermove',e=>{
   if(!pts.has(e.pointerId)) return; pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -582,7 +600,7 @@ const up=e=>{
   if(!down||G.mode!=='play'||!G.running){if(pts.size<2) down=null; return;}
   const d=down; down=null; if(d.moved||d.held) return;
   const h=pick(d.x,d.y); if(!h) return;
-  if(G.tool==='tweezers') peelAttempt(h.piece,false); else hitAt(h.piece,h.dir);
+  if(G.tool==='tweezers') peelAttempt(h.piece); else hitAt(h.piece,h.dir);
 };
 canvas.addEventListener('pointerup',up); canvas.addEventListener('pointercancel',up);
 canvas.addEventListener('wheel',e=>{if(G.mode!=='play') return; e.preventDefault(); G.zoom=clamp(G.zoom*(e.deltaY<0?1.08:.92),.8,2.6); fitCamera();},{passive:false});
