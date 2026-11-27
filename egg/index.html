@@ -81,7 +81,14 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
 .tool svg{width:34px;height:34px}
 .tool small{font-size:.62rem;color:var(--muted);font-weight:500}
 .tool[aria-pressed="true"]{border-color:var(--yolk);background:rgba(242,182,50,.16)}
-#finishArt{display:none}
+.goalrow{display:flex;justify-content:center;align-items:center;gap:.5rem}
+.inside{text-align:center;font-size:.85rem;font-weight:700;color:#ffe3a1;text-shadow:0 1px 6px #000}
+.inside .rare{color:#ff9a6a}
+.card.wide{grid-column:1/-1}
+.card .rule{font-size:.9rem;font-weight:900;color:var(--yolk)}
+.card.mon{background:rgba(120,70,160,.18)}
+.streak{font-size:.85rem;color:var(--muted);text-align:center}
+.surprise .yk,.zi .yk{display:flex;align-items:center;justify-content:center;font-weight:900}
 .hint{font-size:.78rem;color:var(--muted);text-align:center;text-shadow:0 1px 4px #000}
 
 #toast{position:absolute;left:50%;top:22%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;width:min(92vw,24rem);transition:opacity .25s}
@@ -137,11 +144,11 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
         <span class="chip" id="hTime">0:00</span>
       </div>
       <div class="gauge" id="hGauge">薄皮 <span class="g"><i id="hDmg"></i></span> <span id="hPct">剥けた 0%</span></div>
-      <div class="goal" id="hGoal"></div>
+      <div class="goalrow"><span class="goal" id="hGoal"></span><button class="chip" id="hCandle">透かす</button></div>
+      <div class="inside" id="hInside"></div>
     </div>
     <div class="bottom">
       <div class="hint" id="hHint">ドラッグで回転 ・ ピンチで拡大</div>
-      <button class="btn sm" id="finishArt">完成！</button>
       <div class="tools">
         <button class="tool" data-tool="spoon" aria-pressed="true"><svg viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="14" cy="14" rx="9" ry="11" transform="rotate(-40 14 14)" fill="#d9dde3"/><rect x="18" y="18" width="5" height="22" rx="2.5" transform="rotate(-40 20 20)" fill="#c2c7cf"/></svg>スプーン<small id="tnSpoon">ステンレス</small></button>
         <button class="tool" data-tool="needle" aria-pressed="false"><svg viewBox="0 0 40 40" aria-hidden="true"><line x1="8" y1="32" x2="33" y2="7" stroke="#e8ebf0" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="29" cy="11" rx="2.6" ry="1" transform="rotate(-45 29 11)" fill="#2a201a"/></svg>針<small id="tnNeedle">縫い針</small></button>
@@ -207,31 +214,45 @@ const $=id=>document.getElementById(id);
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)), lerp=(a,b,t)=>a+(b-a)*t;
 
 /* ---------- data ---------- */
-// yolk varieties (all real): the hen's feed sets the colour; young hens sometimes lay double-yolked eggs
-const YOLKS={
-  normal:{name:'ふつうの黄身',color:'#f4b63a',n:1,fact:'いつもの黄身。色は鶏が食べたエサで決まります。'},
-  orange:{name:'濃いオレンジの黄身',color:'#ec7a22',n:1,fact:'パプリカやトウモロコシを多く食べた鶏の卵は、黄身が濃い色になります。'},
-  pale:{name:'レモン色の黄身',color:'#f3e19b',n:1,fact:'お米を多く食べて育った鶏の卵は、黄身が白っぽいレモン色になります。'},
-  twin:{name:'双子の黄身',color:'#f4b63a',n:2,fact:'若い鶏がたまに産む、黄身が2つ入った卵。めったに出会えません。'},
-  triplet:{name:'三つ子の黄身',color:'#f4b63a',n:3,fact:'黄身が3つ。宝くじ並みの珍しさです。'},
-  big:{name:'特大の黄身',color:'#f0a93a',n:1,fact:'ダチョウの黄身は、鶏の卵20個分以上の大きさがあります。'},
+// what can be inside. The first block is real (feed colours the yolk, young hens lay double yolks,
+// an egg inside an egg and a yolkless "wind egg" really happen); the rest belongs to the monster eggs.
+const CONTENTS={
+  normal:{name:'ふつうの黄身',kind:'yolk',color:'#f4b63a',n:1,fact:'いつもの黄身。色は鶏が食べたエサで決まります。'},
+  orange:{name:'濃いオレンジの黄身',kind:'yolk',color:'#ec7a22',n:1,fact:'パプリカやトウモロコシを多く食べた鶏の卵は、黄身が濃い色になります。'},
+  pale:{name:'レモン色の黄身',kind:'yolk',color:'#f3e19b',n:1,fact:'お米を多く食べて育った鶏の卵は、黄身が白っぽいレモン色になります。'},
+  twin:{name:'双子の黄身',kind:'yolk',color:'#f4b63a',n:2,fact:'若い鶏がたまに産む、黄身が2つ入った卵。めったに出会えません。'},
+  triplet:{name:'三つ子の黄身',kind:'yolk',color:'#f4b63a',n:3,fact:'黄身が3つ。宝くじ並みの珍しさです。'},
+  big:{name:'特大の黄身',kind:'yolk',color:'#f0a93a',n:1,big:true,fact:'大きな鳥の卵は黄身も特大。ダチョウなら鶏の卵20個分以上です。'},
+  eggInEgg:{name:'卵の中に卵',kind:'egg',fact:'ごくまれに、卵の中に殻つきの卵がもう1個入っていることがあります。本当にある現象です。'},
+  noYolk:{name:'黄身のない卵',kind:'none',fact:'「風卵」とも呼ばれる、黄身の入っていない卵。産みはじめの若い鶏にまれに見られます。'},
+  iceCore:{name:'氷の黄身',kind:'ice',fact:'触るとひんやり。溶けるまで食べられません（たぶん）。'},
+  gem:{name:'卵の宝石',kind:'gem',fact:'キラキラした結晶。どうやって入ったのかは誰にも分からない。'},
+  star:{name:'星の黄身',kind:'star',fact:'夜空のかけらが固まった黄身。ほんのり光る。'},
+  thunder:{name:'雷の玉',kind:'thunder',fact:'パチパチと静電気。殻が勝手に割れていたのは、こいつのせい。'},
+  ammonite:{name:'アンモナイト',kind:'ammonite',fact:'化石の卵の中から、なぜかアンモナイト。太古のロマン。'},
+  dragon:{name:'ドラゴンの赤ちゃん',kind:'dragon',fact:'まだ眠っている小さなドラゴン。そっと剥けば起きません。'},
+  goldYolk:{name:'金の黄身',kind:'gold',fact:'金色に輝く黄身。とても縁起がいい。'},
+  eye:{name:'目玉',kind:'eye',fact:'こっちを見ている…。魔物の卵では、よくあること。'},
 };
+// pattern: spots / speckle / grain / frost / stone / zigzag / scales / stars
 const EGGS=[
-  {id:'uzura',name:'うずらの卵',scale:0.62,pieces:30,shell:[233,222,200],spots:true,thick:[1,1.4],mem:.9,sticky:.1,rank:0,
-   desc:'小さくて、すぐ剥ける。まだら模様がかわいい。',yolks:[['normal',70],['orange',20],['twin',8],['triplet',2]]},
-  {id:'tori',name:'鶏の卵',scale:1,pieces:48,shell:[226,188,150],thick:[1,2.2],mem:1,sticky:.14,rank:0,
-   desc:'いちばん身近な卵。剥き方の基本はここで。',yolks:[['normal',60],['orange',18],['pale',14],['twin',7],['triplet',1]]},
-  {id:'ukokkei',name:'烏骨鶏の卵',scale:0.84,pieces:42,shell:[240,226,200],thick:[1,1.8],mem:1.1,sticky:.16,rank:1,
-   desc:'少し小ぶりで、薄皮がとても破れやすい。',yolks:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
-  {id:'ahiru',name:'アヒルの卵',scale:1.15,pieces:56,shell:[220,232,224],thick:[1.4,2.8],mem:0.9,sticky:.18,rank:2,
-   desc:'大きくて殻が硬め。針は何度か刺す必要あり。',yolks:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
-  {id:'dachou',name:'ダチョウの卵',scale:1.9,pieces:76,shell:[240,232,212],pores:true,thick:[2.2,3.8],mem:0.8,sticky:.24,rank:3,
-   desc:'世界一大きな卵。殻が分厚く、スプーンの出番。',yolks:[['big',90],['twin',10]]},
+  {id:'uzura',name:'うずらの卵',scale:.62,pieces:30,shell:[233,222,200],pattern:'spots',thick:[1,1.4],mem:.9,desc:'小さくて、すぐ剥ける。まだら模様がかわいい。',contents:[['normal',70],['orange',20],['twin',8],['triplet',2]]},
+  {id:'tori',name:'鶏の卵',scale:1,pieces:48,shell:[226,188,150],thick:[1,2.2],mem:1,desc:'いちばん身近な卵。剥き方の基本はここで。',contents:[['normal',56],['orange',18],['pale',14],['twin',7],['noYolk',3],['triplet',1],['eggInEgg',1]]},
+  {id:'ukokkei',name:'烏骨鶏の卵',scale:.84,pieces:42,shell:[240,226,200],thick:[1,1.8],mem:1.1,desc:'少し小ぶりで、薄皮が破れやすい。',contents:[['normal',55],['orange',30],['twin',13],['triplet',2]]},
+  {id:'kiji',name:'キジの卵',scale:.72,pieces:34,shell:[168,150,112],thick:[1,1.6],mem:1,desc:'日本の国鳥。オリーブ色の小さな卵。',contents:[['normal',60],['orange',25],['twin',13],['triplet',2]]},
+  {id:'ahiru',name:'アヒルの卵',scale:1.15,pieces:56,shell:[220,232,224],thick:[1.4,2.8],mem:.9,desc:'大きくて殻が硬め。針は何度か刺す。',contents:[['normal',53],['orange',30],['twin',13],['eggInEgg',2],['triplet',2]]},
+  {id:'horohoro',name:'ホロホロ鳥の卵',scale:.7,pieces:34,shell:[214,186,150],pattern:'speckle',thick:[2,3],mem:.9,desc:'小さいのに殻がとても厚い。根気の卵。',contents:[['normal',60],['orange',30],['twin',10]]},
+  {id:'gachou',name:'ガチョウの卵',scale:1.35,pieces:58,shell:[242,238,228],thick:[1.6,2.8],mem:.9,desc:'真っ白で大きい。剥きがいあり。',contents:[['normal',55],['orange',25],['twin',15],['eggInEgg',5]]},
+  {id:'emu',name:'エミューの卵',scale:1.6,pieces:64,shell:[44,74,62],pattern:'grain',thick:[2,3.2],mem:.85,desc:'深い緑色の大きな卵。宝石のような殻。',contents:[['big',85],['twin',15]]},
+  {id:'dachou',name:'ダチョウの卵',scale:1.9,pieces:76,shell:[240,232,212],pattern:'pores',thick:[2.2,3.8],mem:.8,desc:'世界一大きな卵。殻が分厚く、スプーンの出番。',contents:[['big',90],['twin',10]]},
+  {id:'ice',name:'氷の卵',monster:true,scale:1.1,pieces:52,shell:[200,228,242],pattern:'frost',thick:[1,1.6],mem:1.15,spread:1.45,rough:.15,desc:'ひびがよく広がる、冷たい卵。薄皮は弱め。',contents:[['iceCore',75],['gem',25]]},
+  {id:'fossil',name:'化石の卵',monster:true,scale:1.2,pieces:56,shell:[150,140,124],pattern:'stone',thick:[2.4,3.6],mem:.8,rough:.95,desc:'太古の卵。石のように硬い。',contents:[['ammonite',80],['gem',20]]},
+  {id:'thunder',name:'雷の卵',monster:true,scale:1.05,pieces:50,shell:[244,214,92],pattern:'zigzag',thick:[1.2,2.2],mem:1,zap:5,desc:'ときどき勝手にバチッと割れる。',contents:[['thunder',85],['star',15]]},
+  {id:'dragon',name:'ドラゴンの卵',monster:true,scale:1.4,pieces:60,shell:[150,42,46],pattern:'scales',thick:[2.4,3.6],mem:.75,rough:.35,metal:.15,desc:'うろこの殻は鉄のように硬い。',contents:[['dragon',80],['goldYolk',12],['eye',8]]},
+  {id:'stardust',name:'星くずの卵',monster:true,scale:1,pieces:50,shell:[36,42,86],pattern:'stars',thick:[1,2],mem:1,desc:'夜空をそのまま閉じこめた卵。',contents:[['star',70],['gem',25],['eye',5]]},
+  {id:'gold',name:'黄金の卵',monster:true,scale:.95,pieces:46,shell:[232,182,72],thick:[1.4,2.4],mem:1,rough:.25,metal:.85,xp:2,desc:'職人の夢。経験値が2倍。',contents:[['goldYolk',80],['gem',20]]},
 ];
-const RANKS=[
-  {name:'見習い',xp:0},{name:'一人前',xp:300},{name:'熟練',xp:900},{name:'名人',xp:2000},{name:'達人',xp:4000},
-];
-// tool upgrades that come with each rank
+const RANKS=[{name:'見習い',xp:0},{name:'一人前',xp:300},{name:'熟練',xp:900},{name:'名人',xp:2000},{name:'達人',xp:4000}];
 const SPOON_DMG=2.1, NEEDLE_DMG=.18, PEEL_FAIL=.75;   // membrane strain per action (the gauge is 100)
 const TOOLTIER=[   // what each craftsman rank does to the tools
   {spoon:'ステンレス',needle:'縫い針',tweezers:'ふつう',   spoonDmg:1,  needleDmg:1,  needleR:.26,peelDmg:1,  partial:.75},
@@ -241,19 +262,32 @@ const TOOLTIER=[   // what each craftsman rank does to the tools
   {spoon:'金のさじ', needle:'金の針',tweezers:'金の精密', spoonDmg:.6, needleDmg:.5, needleR:.31,peelDmg:.4, partial:.4},
 ];
 const ARTS=[
-  {id:'heart',name:'ハート',desc:'正面にハートを残して、ほかを全部剥く。'},
-  {id:'star',name:'星',desc:'とがった5つの角を残せるか。'},
   {id:'circle',name:'まる',desc:'まずはここから。正面に丸を残す。'},
+  {id:'heart',name:'ハート',desc:'正面にハートを残して、ほかを全部剥く。'},
+  {id:'star',name:'星',desc:'5つの角を残す。'},
   {id:'smile',name:'にこにこ',desc:'目と口を残す、細かい仕事。'},
+];
+// today's egg comes with one of these twists
+const RULES=[
+  {id:'nospoon',name:'スプーン禁止',desc:'針とピンセットだけで剥く'},
+  {id:'noneedle',name:'針禁止',desc:'スプーンとピンセットだけで剥く'},
+  {id:'time90',name:'90秒勝負',desc:'90秒以内に剥き切れ'},
+  {id:'half',name:'薄皮が半分',desc:'薄皮ゲージが半分たまった状態から始まる'},
+  {id:'noglow',name:'光らない破片',desc:'剥がせる破片が光らない。目で見極めろ'},
+  {id:'spread',name:'割れやすい殻',desc:'ひびがいつもの1.6倍広がる'},
+  {id:'many',name:'細かい殻',desc:'破片がいつもの1.6倍'},
+  {id:'lucky',name:'会心デー',desc:'会心の一撃とズルッとが出やすい'},
 ];
 
 /* ---------- save ---------- */
 const KEY='hadaka-tamago-v1';
-const fresh=()=>({xp:0,zukan:{},daily:{},arts:{},sound:true,tips:false,best:{}});
+const fresh=()=>({xp:0,zukan:{},daily:{},arts:{},sound:true,tips:false,cleared:{},streak:{n:0,last:''}});
 let S=fresh(); try{const r=localStorage.getItem(KEY); if(r) S=Object.assign(fresh(),JSON.parse(r));}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const rankIdx=()=>{let r=0; RANKS.forEach((k,i)=>{if(S.xp>=k.xp) r=i}); return r;};
 const tier=()=>TOOLTIER[rankIdx()];
+const unlocked=i=>i<2||!!S.cleared[EGGS[i-1].id];
+const isRare=(E,c)=>{let tot=0,w=0; for(const [k,x] of E.contents){tot+=x; if(k===c) w=x;} return w/tot<.1;};
 
 /* ---------- random ---------- */
 function rngOf(seed){let s=seed>>>0||1; return ()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296);}
@@ -283,6 +317,8 @@ const SFX={
   tear(){if(!audio())return; const t=AC.currentTime; nz(t,.5,{type:'lowpass',f:700,f2:200,g:.4,a:.03}); tn(t,.4,200,70,{g:.25});},
   done(){if(!audio())return; const t=AC.currentTime; [523,659,784,1047].forEach((f,i)=>tn(t+i*.09,.35,f,f,{type:'triangle',g:.14})); for(let i=0;i<40;i++) nz(t+.35+Math.random()*1.6,.04,{f:1200+Math.random()*1500,q:1.3,g:.12*(1-i/40)});},
   lucky(){if(!audio())return; const t=AC.currentTime; nz(t,.25,{type:'highpass',f:1800,g:.5}); [784,988,1175,1568].forEach((f,i)=>tn(t+.05+i*.06,.3,f,f*1.01,{type:'triangle',g:.14}));},
+  zap(){if(!audio())return; const t=AC.currentTime; for(let i=0;i<5;i++) nz(t+i*.03,.05,{type:'highpass',f:3000+Math.random()*3000,g:.3}); tn(t,.2,1800,300,{type:'sawtooth',g:.05});},
+  candle(){if(!audio())return; const t=AC.currentTime; tn(t,.6,440,660,{g:.06}); tn(t+.15,.6,660,880,{g:.05});},
   wobble(){if(!audio())return; const t=AC.currentTime; tn(t,.5,180,110,{g:.18}); tn(t+.1,.4,150,95,{g:.12});},
 };
 function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
@@ -296,23 +332,21 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1
 const scene=new THREE.Scene();
 scene.background=new THREE.Color('#2a201a');
 const camera=new THREE.PerspectiveCamera(34,1,.1,100);
-scene.add(new THREE.HemisphereLight(0xfff1dc,0x3a2a20,.75));
+const hemi=new THREE.HemisphereLight(0xfff1dc,0x3a2a20,.75); scene.add(hemi);
 const key=new THREE.DirectionalLight(0xfff4e6,1.15); key.position.set(-2.5,3.5,4); scene.add(key);
 const rim=new THREE.DirectionalLight(0xffd7a0,.6); rim.position.set(3,1,-3); scene.add(rim);
-// soft shadow under the egg on the counter
 const shadowTex=(()=>{const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d'); const gr=g.createRadialGradient(64,64,4,64,64,62); gr.addColorStop(0,'rgba(0,0,0,.55)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.fillRect(0,0,128,128); return new THREE.CanvasTexture(c);})();
 const shadow=new THREE.Mesh(new THREE.PlaneGeometry(2.4,2.4),new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false}));
 shadow.rotation.x=-Math.PI/2; shadow.position.y=-1.45; scene.add(shadow);
-// counter: a wooden board fading into the dark
 const boardTex=(()=>{const c=document.createElement('canvas'); c.width=512; c.height=512; const g=c.getContext('2d'); g.fillStyle='#4a3626'; g.fillRect(0,0,512,512);
   for(let i=0;i<70;i++){g.strokeStyle=`rgba(${20+Math.random()*30},${12+Math.random()*16},6,${.15+Math.random()*.2})`; g.lineWidth=1+Math.random()*3; g.beginPath(); const y=Math.random()*512; g.moveTo(0,y); for(let x=0;x<=512;x+=32) g.lineTo(x,y+Math.sin(x*.02+i)*6); g.stroke();}
   const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); t.encoding=THREE.sRGBEncoding; return t;})();
 const board=new THREE.Mesh(new THREE.CircleGeometry(7,48),new THREE.MeshStandardMaterial({map:boardTex,roughness:.85}));
 board.rotation.x=-Math.PI/2; board.position.y=-1.47; scene.add(board);
 scene.fog=new THREE.Fog('#2a201a',6,13);
-
 const root=new THREE.Group(); scene.add(root);       // rotates with the player's drag
 let eggGroup=null;
+const candleLight=new THREE.PointLight(0xffb060,0,6,1.5);  // the candling lamp shines from inside
 
 /* egg shape: pointed end up (+y), blunt end (air cell) down */
 const EH=1.28, ET=0.12;
@@ -325,16 +359,46 @@ const BASE=(()=>{let g=new THREE.IcosahedronGeometry(1,26); if(g.index) g=g.toNo
 const MEMBRANE_GEO=(()=>{let g=new THREE.IcosahedronGeometry(1,16); if(g.index) g=g.toNonIndexed(); const p=g.attributes.position, v=new THREE.Vector3(), o=new THREE.Vector3(), n=new THREE.Vector3(), nr=[];
   for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).normalize(); shapeP(v,o).multiplyScalar(.985); shapeN(v,n); p.setXYZ(i,o.x,o.y,o.z); nr.push(n.x,n.y,n.z);} g.setAttribute('normal',new THREE.Float32BufferAttribute(nr,3)); return g;})();
 
+function shellColor(E,v,seed,out){
+  const g=noise3(v.x*22,v.y*22,v.z*22,seed)*.07+noise3(v.x*5,v.y*5,v.z*5,seed+1)*.06;
+  let r=E.shell[0]/255,gg=E.shell[1]/255,b=E.shell[2]/255, m=1-g;
+  const mix=(c,d)=>{r=lerp(r,c[0],d); gg=lerp(gg,c[1],d); b=lerp(b,c[2],d);};
+  switch(E.pattern){
+    case 'spots':{const sp=noise3(v.x*9,v.y*9,v.z*9,seed+2); if(sp>.62) mix([.33,.24,.17],clamp((sp-.62)*5,0,1)); break;}
+    case 'speckle':{const sp=noise3(v.x*34,v.y*34,v.z*34,seed+2); if(sp>.72) mix([.95,.93,.9],clamp((sp-.72)*6,0,1)); break;}
+    case 'grain':{m*=.85+.3*noise3(v.x*30,v.y*30,v.z*30,seed+2); break;}
+    case 'pores':{const sp=noise3(v.x*40,v.y*40,v.z*40,seed+3); if(sp>.8) m*=.86; break;}
+    case 'frost':{const sp=noise3(v.x*14,v.y*14,v.z*14,seed+2); mix([.97,.99,1],clamp((sp-.45)*2,0,1)*.7); break;}
+    case 'stone':{m*=.75+.5*noise3(v.x*12,v.y*12,v.z*12,seed+2); const cr=noise3(v.x*6,v.y*6,v.z*6,seed+4); if(Math.abs(cr-.5)<.02) m*=.6; break;}
+    case 'zigzag':{const band=Math.abs(v.y-.25*Math.sin(Math.atan2(v.z,v.x)*6)); if(band<.08) mix([.3,.24,.55],1); break;}
+    case 'scales':{const a=Math.atan2(v.z,v.x)*7, y=v.y*9; const row=Math.floor(y), cx=a+(row%2?.5:0); const fx=cx-Math.floor(cx)-.5, fy=y-row-.5; const d=Math.hypot(fx*1.2,fy); m*=d>.42?.55:1.05-d*.4; break;}
+    case 'stars':{const sp=noise3(v.x*45,v.y*45,v.z*45,seed+2); if(sp>.83) mix([1,.97,.8],1); const neb=noise3(v.x*3,v.y*3,v.z*3,seed+5); mix([.45,.25,.6],neb*.35); break;}
+  }
+  return out.setRGB(clamp(r*m,0,1),clamp(gg*m,0,1),clamp(b*m,0,1)).convertSRGBToLinear();
+}
+
 function buildEgg(E,seed,opts={}){
   const rng=rngOf(seed);
-  const N=opts.pieces||E.pieces;
+  const N=Math.round((opts.pieces||E.pieces)*(opts.many?1.6:1));
+  const pos=BASE.attributes.position.array, F=pos.length/9;
+  const c=new THREE.Vector3();
+  const faceDir=f=>c.set(pos[f*9]+pos[f*9+3]+pos[f*9+6],pos[f*9+1]+pos[f*9+4]+pos[f*9+7],pos[f*9+2]+pos[f*9+5]+pos[f*9+8]).normalize();
   // Voronoi seeds on the sphere: a jittered Fibonacci spread, so pieces are even but never the same twice
   const seeds=[]; const ga=Math.PI*(3-Math.sqrt(5));
-  for(let i=0;i<N;i++){const y=1-(i+.5)/N*2, r=Math.sqrt(1-y*y), th=i*ga+rng()*.9; const v=new THREE.Vector3(Math.cos(th)*r+(rng()-.5)*.12,y+(rng()-.5)*.12,Math.sin(th)*r+(rng()-.5)*.12).normalize(); seeds.push(v);}
-  const pos=BASE.attributes.position.array, F=pos.length/9;
-  const faceP=new Int32Array(F), c=new THREE.Vector3();
-  for(let f=0;f<F;f++){c.set(pos[f*9]+pos[f*9+3]+pos[f*9+6],pos[f*9+1]+pos[f*9+4]+pos[f*9+7],pos[f*9+2]+pos[f*9+5]+pos[f*9+8]).normalize();
-    let best=-2,bi=0; for(let i=0;i<N;i++){const d=c.dot(seeds[i]); if(d>best){best=d;bi=i;}} faceP[f]=bi;}
+  for(let i=0;i<N;i++){const y=1-(i+.5)/N*2, r=Math.sqrt(1-y*y), th=i*ga+rng()*.9; seeds.push(new THREE.Vector3(Math.cos(th)*r+(rng()-.5)*.12,y+(rng()-.5)*.12,Math.sin(th)*r+(rng()-.5)*.12).normalize());}
+  // egg art: the shape's outline becomes a crack line. Faces inside the shape only join pieces inside it.
+  let faceIn=null, seedIn=null;
+  if(opts.art){
+    faceIn=new Uint8Array(F); for(let f=0;f<F;f++) faceIn[f]=artKeep(opts.art,faceDir(f))?1:0;
+    seedIn=seeds.map(s=>artKeep(opts.art,s));
+    const want=Math.max(4,Math.round(N*.08)); let have=seedIn.filter(Boolean).length;
+    const inside=[]; for(let f=0;f<F;f++) if(faceIn[f]) inside.push(f);
+    while(have<want&&inside.length){const f=inside[Math.floor(rng()*inside.length)]; seeds.push(faceDir(f).clone()); seedIn.push(true); have++;}
+  }
+  const NS=seeds.length;
+  const faceP=new Int32Array(F);
+  for(let f=0;f<F;f++){faceDir(f); let best=-2,bi=0; const want=faceIn?faceIn[f]===1:null;
+    for(let i=0;i<NS;i++){ if(faceIn&&seedIn[i]!==want) continue; const d=c.dot(seeds[i]); if(d>best){best=d;bi=i;}} faceP[f]=bi;}
   // edges between faces of different pieces become the cracks
   const vk=(i)=>`${Math.round(pos[i]*1e4)},${Math.round(pos[i+1]*1e4)},${Math.round(pos[i+2]*1e4)}`;
   const edges=new Map();
@@ -343,38 +407,63 @@ function buildEgg(E,seed,opts={}){
   for(const ent of edges.values()){ if(ent.f2===undefined) continue; const p1=faceP[ent.f1], p2=faceP[ent.f2]; if(p1===p2) continue;
     const lo=Math.min(p1,p2), hi=Math.max(p1,p2), k=lo*1000+hi; let pr=pairs.get(k); if(!pr){pr={a:lo,b:hi,segs:[],mid:new THREE.Vector3()}; pairs.set(k,pr);}
     pr.segs.push(ent.a,ent.b); pr.mid.x+=pos[ent.a]+pos[ent.b]; pr.mid.y+=pos[ent.a+1]+pos[ent.b+1]; pr.mid.z+=pos[ent.a+2]+pos[ent.b+2];}
-  const PAIRS=[...pairs.values()];
   const tseed=Math.floor(rng()*1e6);
-  for(const pr of PAIRS){pr.mid.normalize(); const th=lerp(E.thick[0],E.thick[1],noise3(pr.mid.x*1.8+5,pr.mid.y*1.8,pr.mid.z*1.8,tseed)); pr.hp=Math.max(1,Math.round(th)); pr.maxhp=pr.hp; pr.cracked=false;}
-  // pieces
-  const counts=new Int32Array(N); for(let f=0;f<F;f++) counts[faceP[f]]++;
-  const mean=F/N, colSeed=Math.floor(rng()*1e6);
-  const pieces=[]; const v=new THREE.Vector3(), o=new THREE.Vector3(), n=new THREE.Vector3(), col=new THREE.Color();
-  for(let i=0;i<N;i++){
-    const P=[],Nr=[],C=[]; const cen=new THREE.Vector3();
-    for(let f=0;f<F;f++){ if(faceP[f]!==i) continue;
-      for(let k=0;k<3;k++){const j=f*9+k*3; v.set(pos[j],pos[j+1],pos[j+2]).normalize(); shapeP(v,o); shapeN(v,n); P.push(o.x,o.y,o.z); Nr.push(n.x,n.y,n.z); cen.add(v);
-        // shell colour: base tint, fine pores, quail speckles, ostrich pits
-        const g=noise3(v.x*22,v.y*22,v.z*22,colSeed)*.07+noise3(v.x*5,v.y*5,v.z*5,colSeed+1)*.06;
-        let r=E.shell[0]/255,gg=E.shell[1]/255,b=E.shell[2]/255, m=1-g;
-        if(E.spots){const sp=noise3(v.x*9,v.y*9,v.z*9,colSeed+2); if(sp>.62){const d=clamp((sp-.62)*5,0,1); r=lerp(r,.33,d); gg=lerp(gg,.24,d); b=lerp(b,.17,d);}}
-        if(E.pores){const sp=noise3(v.x*40,v.y*40,v.z*40,colSeed+3); if(sp>.8) m*=.86;}
-        col.setRGB(r*m,gg*m,b*m).convertSRGBToLinear(); C.push(col.r,col.g,col.b);}}
-    cen.normalize();
-    const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); geo.setAttribute('normal',new THREE.Float32BufferAttribute(Nr,3)); geo.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
-    pieces.push({i,geo,dir:cen,area:counts[i],big:counts[i]>mean*1.45,removed:false,sticky:false,stickyKnown:false,air:cen.y<-0.8,keep:false,mesh:null,nbr:[]});
-  }
-  for(const pr of PAIRS){pieces[pr.a].nbr.push(pr); pieces[pr.b].nbr.push(pr);}
-  // what is inside (decided now, seen only at the end)
-  let tot=0; for(const [,w] of E.yolks) tot+=w; let r=rng()*tot, yolk=E.yolks[0][0]; for(const [k,w] of E.yolks){if((r-=w)<0){yolk=k;break;}}
-  return {E,seeds,pieces,pairs:PAIRS,total:F,yolk,rng};
+  // pieces (seeds that won no faces are dropped and the rest renumbered)
+  const counts=new Int32Array(NS); for(let f=0;f<F;f++) counts[faceP[f]]++;
+  const remap=new Int32Array(NS).fill(-1); let M=0; for(let i=0;i<NS;i++) if(counts[i]>0) remap[i]=M++;
+  const mean=F/M, colSeed=Math.floor(rng()*1e6);
+  const P=[...Array(M)].map(()=>({P:[],N:[],C:[],cen:new THREE.Vector3(),area:0,keep:false}));
+  const v=new THREE.Vector3(), o=new THREE.Vector3(), n=new THREE.Vector3(), col=new THREE.Color();
+  for(let f=0;f<F;f++){const q=P[remap[faceP[f]]]; q.area++; if(faceIn&&faceIn[f]) q.keep=true;
+    for(let k=0;k<3;k++){const j=f*9+k*3; v.set(pos[j],pos[j+1],pos[j+2]).normalize(); shapeP(v,o); shapeN(v,n); q.P.push(o.x,o.y,o.z); q.N.push(n.x,n.y,n.z); q.cen.add(v);
+      shellColor(E,v,colSeed,col); if(faceIn&&faceIn[f]) col.lerp(new THREE.Color('#f2b632').convertSRGBToLinear(),.55); q.C.push(col.r,col.g,col.b);}}
+  const pieces=P.map((q,i)=>{const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(q.P,3)); geo.setAttribute('normal',new THREE.Float32BufferAttribute(q.N,3)); geo.setAttribute('color',new THREE.Float32BufferAttribute(q.C,3));
+    const dir=q.cen.normalize(); return {i,geo,dir,area:q.area,big:q.area>mean*1.45,removed:false,air:dir.y<-0.8,keep:q.keep,mesh:null,nbr:[]};});
+  const PAIRS=[];
+  for(const pr of pairs.values()){pr.a=remap[pr.a]; pr.b=remap[pr.b]; pr.mid.normalize(); const th=lerp(E.thick[0],E.thick[1],noise3(pr.mid.x*1.8+5,pr.mid.y*1.8,pr.mid.z*1.8,tseed)); pr.hp=Math.max(1,Math.round(th)); pr.maxhp=pr.hp; pr.cracked=false; PAIRS.push(pr); pieces[pr.a].nbr.push(pr); pieces[pr.b].nbr.push(pr);}
+  // what is inside (decided now; candling shows it before you start)
+  let tot=0; for(const [,w] of E.contents) tot+=w; let r=rng()*tot, inside=E.contents[0][0]; for(const [k,w] of E.contents){if((r-=w)<0){inside=k;break;}}
+  return {E,pieces,pairs:PAIRS,total:F,inside,rng};
 }
 
+/* ---------- what's inside, as 3D ---------- */
+function buildContents(id,E){
+  const C=CONTENTS[id], g=new THREE.Group(); const std=(o)=>new THREE.MeshStandardMaterial(o);
+  const yolk=(r,color,x,y,z)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,32,24),std({color,roughness:.3,emissive:new THREE.Color(color),emissiveIntensity:.28})); m.position.set(x,y,z); g.add(m);};
+  switch(C.kind){
+    case 'yolk': if(C.n===1) yolk(C.big?.5:.44,C.color,0,-.1,0); else if(C.n===2){yolk(.36,C.color,-.24,-.13,.05); yolk(.36,C.color,.24,.08,-.05);} else {yolk(.31,C.color,-.26,-.23,0); yolk(.31,C.color,.24,-.18,.08); yolk(.31,C.color,0,.36,-.04);} break;
+    case 'egg':{const m=new THREE.Mesh(new THREE.SphereGeometry(.42,32,24),std({color:`rgb(${E.shell.join(',')})`,roughness:.6})); m.scale.set(1,1.25,1); g.add(m); break;}
+    case 'none': break;
+    case 'ice':{const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.42,0),std({color:'#cfeeff',roughness:.05,metalness:.1,emissive:new THREE.Color('#7cc8ff'),emissiveIntensity:.35,flatShading:true,transparent:true,opacity:.9})); g.add(m); break;}
+    case 'gem':{const m=new THREE.Mesh(new THREE.OctahedronGeometry(.4,0),std({color:'#86e0ff',roughness:.05,metalness:.3,emissive:new THREE.Color('#2a8cff'),emissiveIntensity:.45,flatShading:true})); m.scale.y=1.3; g.add(m); g.userData.spin=1; break;}
+    case 'star':{const sh=new THREE.Shape(); for(let k=0;k<10;k++){const rr=k%2?.18:.42, a=k*Math.PI/5; const x=rr*Math.sin(a), y=rr*Math.cos(a); k?sh.lineTo(x,y):sh.moveTo(x,y);} sh.closePath();
+      const m=new THREE.Mesh(new THREE.ExtrudeGeometry(sh,{depth:.14,bevelEnabled:true,bevelSize:.03,bevelThickness:.03,bevelSegments:2}),std({color:'#ffd84a',roughness:.3,emissive:new THREE.Color('#ffb300'),emissiveIntensity:.6})); m.position.z=-.07; g.add(m); g.userData.spin=1; break;}
+    case 'thunder':{yolk(.3,'#ffe14a',0,0,0); g.children[0].material.emissiveIntensity=1; for(let k=0;k<2;k++){const t=new THREE.Mesh(new THREE.TorusGeometry(.42,.02,8,48),std({color:'#fff3a0',emissive:new THREE.Color('#ffe14a'),emissiveIntensity:1})); t.rotation.set(k?1.1:-.6,k?.4:1.2,0); g.add(t);} g.userData.spin=3; break;}
+    case 'ammonite':{const pts=[]; for(let k=0;k<=120;k++){const a=k/120*Math.PI*5, rr=.04+.07*a; pts.push(new THREE.Vector3(Math.cos(a)*rr*.55,Math.sin(a)*rr*.55,0));}
+      const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),160,.055,10),std({color:'#9a8466',roughness:.9})); g.add(m); break;}
+    case 'dragon':{const skin=std({color:'#3fa58a',roughness:.5}), belly=std({color:'#d9c27a',roughness:.6}), dark=std({color:'#1b1b1b'});
+      const body=new THREE.Mesh(new THREE.SphereGeometry(.3,24,18),skin); body.scale.set(1,.9,1); body.position.y=-.12; g.add(body);
+      const tummy=new THREE.Mesh(new THREE.SphereGeometry(.2,20,14),belly); tummy.position.set(0,-.14,.17); tummy.scale.z=.6; g.add(tummy);
+      const head=new THREE.Mesh(new THREE.SphereGeometry(.2,24,18),skin); head.position.set(0,.22,.1); g.add(head);
+      for(const s of [-1,1]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.07,.012,.02),dark); eye.position.set(s*.08,.25,.28); g.add(eye);
+        const horn=new THREE.Mesh(new THREE.ConeGeometry(.04,.12,10),belly); horn.position.set(s*.1,.4,.05); horn.rotation.z=-s*.3; g.add(horn);
+        const wing=new THREE.Mesh(new THREE.ConeGeometry(.16,.32,3),std({color:'#2d7d69',roughness:.5})); wing.position.set(s*.3,0,-.05); wing.rotation.set(.2,0,-s*1.1); wing.scale.z=.25; g.add(wing);}
+      const tail=new THREE.Mesh(new THREE.TorusGeometry(.22,.06,10,24,Math.PI*1.2),skin); tail.position.set(0,-.36,0); tail.rotation.set(Math.PI/2,0,.6); g.add(tail);
+      g.userData.breathe=1; break;}
+    case 'gold':{const m=new THREE.Mesh(new THREE.SphereGeometry(.44,32,24),std({color:'#f5c542',roughness:.25,metalness:.6,emissive:new THREE.Color('#c98a00'),emissiveIntensity:.55})); m.position.y=-.08; g.add(m); break;}
+    case 'eye':{const w=new THREE.Mesh(new THREE.SphereGeometry(.36,32,24),std({color:'#fbf8f2',roughness:.25})); g.add(w);
+      const iris=new THREE.Mesh(new THREE.CircleGeometry(.17,32),std({color:'#3b7be0',roughness:.3,emissive:new THREE.Color('#1d4fb0'),emissiveIntensity:.3})); iris.position.z=.361; g.add(iris);
+      const pupil=new THREE.Mesh(new THREE.CircleGeometry(.08,24),std({color:'#0b0b0b'})); pupil.position.z=.363; g.add(pupil); g.userData.look=1; break;}
+  }
+  g.position.y=-.05; return g;
+}
+function contentIcon(id){const C=CONTENTS[id];
+  if(C.kind==='yolk') return C.n>1?`<span class="yk" style="background:radial-gradient(circle at 35% 40%,${C.color} 0 28%,transparent 29%),radial-gradient(circle at 68% 62%,${C.color} 0 28%,transparent 29%),rgba(255,255,255,.08)"></span>`:`<span class="yk" style="background:${C.color}"></span>`;
+  const glyph={egg:['卵','#e9d6b8'],none:['空','#3a2c22'],ice:['氷','#bfe6ff'],gem:['◆','#7fd6ff'],star:['★','#ffd84a'],thunder:['雷','#ffe14a'],ammonite:['＠','#b49a74'],dragon:['竜','#3fa58a'],gold:['金','#f5c542'],eye:['◉','#fbf8f2']}[C.kind];
+  return `<span class="yk" style="background:${glyph[1]};color:#2a1d14;font-size:1.2rem">${glyph[0]}</span>`;}
+
 /* ---------- materials ---------- */
-const shellMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.62,metalness:0});
-const shellLift=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:0,emissive:new THREE.Color('#ffc65a'),emissiveIntensity:.4});
-const stickyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:0,emissive:new THREE.Color('#6b3a10'),emissiveIntensity:.35});
-const keepMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.1,emissive:new THREE.Color('#f2b632'),emissiveIntensity:.45});
+const keepMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:.15,emissive:new THREE.Color('#f2b632'),emissiveIntensity:.35});
 const crackMat=new THREE.LineBasicMaterial({color:'#2a1d14'});
 const membraneMat=new THREE.MeshPhysicalMaterial({color:'#fbf3e4',roughness:.2,metalness:0,clearcoat:.7,clearcoatRoughness:.2,transparent:true,opacity:.55,depthWrite:false});
 const whiteMat=new THREE.MeshStandardMaterial({color:'#fff6e6',roughness:.15,transparent:true,opacity:.6,depthWrite:false,side:THREE.BackSide});
@@ -382,41 +471,49 @@ const dmgMat=new THREE.MeshBasicMaterial({color:'#b58f6a',transparent:true,opaci
 
 /* ---------- game state ---------- */
 const G={flash:0,mode:'menu',egg:null,tool:'spoon',dmg:0,t:0,running:false,lastPeel:-9,combo:0,removedArea:0,done:false,failed:false,slow:false,bonus:0,
-  kind:'free',daily:null,art:null,zoom:1,jiggle:0,flakes:[],crackLines:null,dmgMarks:[],yolks:[],finishT:0,spin:0};
+  kind:'free',daily:null,rule:null,art:null,zoom:1,jiggle:0,flakes:[],crackLines:null,contents:null,candle:0,candleT:0,zapT:0,showcase:0};
 
 function clearEgg(){ if(eggGroup){root.remove(eggGroup); eggGroup.traverse(o=>{if(o.geometry&&o.geometry!==MEMBRANE_GEO) o.geometry.dispose();});} eggGroup=null; G.flakes.forEach(f=>scene.remove(f.m)); G.flakes=[]; }
+const R_=id=>G.rule&&G.rule.id===id;
 
 function startEgg(E,seed,kind='free',extra={}){
   clearEgg();
-  const egg=buildEgg(E,seed,{pieces:kind==='art'?110:undefined});
-  G.egg=egg; G.kind=kind; G.art=extra.art||null; G.daily=extra.daily||null;
-  G.dmg=0; G.t=0; G.running=true; G.done=false; G.failed=false; G.lastPeel=-9; G.combo=0; G.removedArea=0; G.slow=false; G.bonus=0; G.jiggle=0; G.dmgMarks=[]; G.finishT=0; G.zoom=1;
+  G.kind=kind; G.art=extra.art||null; G.daily=extra.daily||null; G.rule=extra.rule||null;
+  const egg=buildEgg(E,seed,{pieces:kind==='art'?70:undefined,art:G.art&&G.art.id,many:R_('many')});
+  G.egg=egg;
+  G.dmg=R_('half')?50:0; G.t=0; G.running=true; G.done=false; G.failed=false; G.lastPeel=-9; G.combo=0; G.removedArea=0; G.slow=false; G.bonus=0; G.jiggle=0; G.zoom=1; G.zapT=E.zap||0; G.showcase=0; G.candleT=0; G.candle=0;
+  // per-egg shell look: metal for gold, gloss for ice, matte for stone
+  G.shellMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:E.rough??.62,metalness:E.metal||0});
+  G.liftMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:Math.min(E.rough??.62,.35),metalness:E.metal||0,emissive:new THREE.Color('#ffc65a'),emissiveIntensity:.4});
   eggGroup=new THREE.Group(); eggGroup.scale.setScalar(E.scale); root.add(eggGroup);
-  root.quaternion.setFromEuler(new THREE.Euler(-.18,.5,0));
-  if(kind==='art') root.quaternion.setFromEuler(new THREE.Euler(-.05,0,0));
-  // inside: egg white, yolk(s), membrane
-  const Y=YOLKS[egg.yolk], yolkMat=new THREE.MeshStandardMaterial({color:Y.color,roughness:.3,emissive:new THREE.Color(Y.color),emissiveIntensity:.28});
-  G.yolks=[];
-  const yr=Y.n===1?.44:Y.n===2?.36:.31, offs=Y.n===1?[[0,-.08,0]]:Y.n===2?[[-.24,-.1,.05],[.24,.06,-.05]]:[[-.26,-.18,0],[.24,-.14,.08],[0,.28,-.04]];
-  for(const o of offs){const m=new THREE.Mesh(new THREE.SphereGeometry(yr,32,24),yolkMat); m.position.set(o[0],o[1]*EH,o[2]); eggGroup.add(m); G.yolks.push(m);}
+  root.quaternion.setFromEuler(kind==='art'?new THREE.Euler(-.05,0,0):new THREE.Euler(-.18,.5,0));
+  G.contents=buildContents(egg.inside,E); eggGroup.add(G.contents);
+  eggGroup.add(candleLight);
   const white=new THREE.Mesh(MEMBRANE_GEO,whiteMat); white.scale.setScalar(.95); eggGroup.add(white);
   const mem=new THREE.Mesh(MEMBRANE_GEO,membraneMat); mem.renderOrder=2; eggGroup.add(mem); G.membrane=mem;
-  // shell pieces
-  for(const p of egg.pieces){
-    if(kind==='art') p.keep=artKeep(G.art.id,p.dir);
-    p.mesh=new THREE.Mesh(p.geo,p.keep?keepMat:shellMat); p.mesh.userData.piece=p; eggGroup.add(p.mesh);}
+  for(const p of egg.pieces){p.mesh=new THREE.Mesh(p.geo,p.keep?keepMat:G.shellMat); p.mesh.userData.piece=p; eggGroup.add(p.mesh);}
   G.crackLines=new THREE.LineSegments(new THREE.BufferGeometry(),crackMat); G.crackLines.renderOrder=3; eggGroup.add(G.crackLines);
-  if(kind==='art') eggGroup.add(artOutline(G.art.id));
-  refreshCracks(); fitCamera(); setTool(kind==='art'?'needle':'spoon'); updateHud();
-  showScreen(null); $('hud').hidden=false;
-  $('finishArt').style.display=kind==='art'?'inline-block':'none';
-  $('hGoal').textContent=kind==='art'?`お題：${G.art.name}　金色の部分を残して、ほかを全部剥く`:kind==='daily'?`今日の卵（${G.daily}）`:'殻を全部剥いて、はだかの卵に';
-  $('hName').textContent=E.name;
+  refreshCracks(); fitCamera();
+  // tools the rule takes away
+  document.querySelector('[data-tool="spoon"]').hidden=R_('nospoon'); document.querySelector('[data-tool="needle"]').hidden=R_('noneedle');
+  setTool(kind==='art'||R_('nospoon')?'needle':'spoon');
+  showScreen(null); $('hud').hidden=false; $('hName').textContent=E.name;
+  $('hGoal').textContent=kind==='art'?`お題「${G.art.name}」：金色の部分を残して、ほかを剥く`:kind==='daily'?`今日の卵：${G.rule.name}`:'殻を全部剥いて、はだかの卵に';
+  const C=CONTENTS[egg.inside], rare=isRare(E,egg.inside);
+  $('hInside').innerHTML=kind==='art'?'':`中身：${C.name}${rare?' <span class="rare">レア！</span>':''}`;
+  updateHud();
   if(!S.tips){S.tips=true; save(); G.running=false; $('help').hidden=false;}
+  if(kind!=='art') candle(2.4,true);
+}
+// candling (検卵): light from inside makes the shell glow and shows what is in the egg
+function candle(sec,intro){G.candleT=sec; SFX.candle(); if(intro){const C=CONTENTS[G.egg.inside]; toast(C.kind==='none'?'検卵：あれ、空っぽ…？':`検卵：${C.name}！`,isRare(G.egg.E,G.egg.inside)?'めずらしい中身。慎重に剥こう':'光にかざすと、中身が透けて見える',2);}}
+function applyCandle(a){
+  for(const m of [G.shellMat,G.liftMat,keepMat]){ if(!m) continue; const tr=a>.01; if(m.transparent!==tr){m.transparent=tr; m.depthWrite=!tr; m.needsUpdate=true;} m.opacity=1-a*.72;}
+  candleLight.intensity=a*2.6; key.intensity=1.15*(1-a*.6); hemi.intensity=.75*(1-a*.5);
 }
 
 // distance that fits the whole egg on any screen shape, leaving room for the HUD above and below
-function baseDist(s){const t=Math.tan(THREE.MathUtils.degToRad(camera.fov/2)); return Math.max((1.3*s/.62)/t,(1.02*s/.86)/(t*camera.aspect));}
+function baseDist(s){const t=Math.tan(THREE.MathUtils.degToRad(camera.fov/2)); return Math.max((1.3*s/.6)/t,(1.02*s/.86)/(t*camera.aspect));}
 function fitCamera(){ const s=G.egg?G.egg.E.scale:1; camera.position.set(0,.1*s,baseDist(s)/G.zoom); camera.lookAt(0,0,0); shadow.scale.setScalar(s); shadow.position.y=-1.3*s-.15; board.position.y=shadow.position.y-.02;}
 
 /* ---------- cracks ---------- */
@@ -428,26 +525,26 @@ function refreshCracks(){
     for(const j of pr.segs){v.set(pos[j],pos[j+1],pos[j+2]).normalize(); shapeP(v,o).multiplyScalar(1.004); P.push(o.x,o.y,o.z);}
   }
   G.crackLines.geometry.dispose(); const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(P,3)); G.crackLines.geometry=g;
-  // pieces whose every edge is cracked lift a little: they are ready to come off
-  for(const p of egg.pieces){ if(p.removed) continue; const f=isFree(p)||crackedShare(p)>=tier().partial; const lift=f?.035:0; p.mesh.position.copy(p.dir).multiplyScalar(lift);
-    p.mesh.material=p.keep?keepMat:(p.stickyKnown?stickyMat:(f?shellLift:shellMat));}
+  const glow=!R_('noglow');
+  for(const p of egg.pieces){ if(p.removed) continue; const f=!p.keep&&ready(p); p.mesh.position.copy(p.dir).multiplyScalar(f&&glow?.035:f?.012:0);
+    p.mesh.material=p.keep?keepMat:(f&&glow?G.liftMat:G.shellMat);}
 }
 function crackedShare(p){let c=0,n=0; for(const pr of p.nbr){const other=G.egg.pieces[pr.a===p.i?pr.b:pr.a]; if(other.removed) continue; n++; if(pr.cracked) c++;} return n?c/n:1;}
 function isFree(p){const s=crackedShare(p); return p.air?s>=.5:s>=1;}
+function ready(p){return isFree(p)||crackedShare(p)>=tier().partial;}
 
 /* ---------- actions ---------- */
-const tmpV=new THREE.Vector3();
+function crackAround(dir,R){let n=0; for(const pr of G.egg.pairs){ if(!pr.cracked&&pr.mid.dot(dir)>Math.cos(R)){pr.cracked=true; pr.hp=0; n++;}} return n;}
 function hitAt(p,dir){
   const T=tier(), E=G.egg.E, isSpoon=G.tool==='spoon';
-  const R=isSpoon?.46:T.needleR, power=isSpoon?3:2;
+  const R=(isSpoon?.46:T.needleR)*(E.spread||1)*(R_('spread')?1.6:1), power=isSpoon?3:2;
+  // hidden bonus: once in a while the spoon lands just right and a whole area shatters with no strain at all
+  if(isSpoon&&G.egg.rng()<(R_('lucky')?.25:.06)){ crackAround(dir,.95); G.bonus+=60; G.flash=1; SFX.lucky(); buzz([20,30,20,30,60]); toast('会心の一撃！','殻が一気に割れた！',1.6); refreshCracks(); updateHud(); return; }
   let cracks=0, hard=0, thinnest=9, near=0, already=0;
   for(const pr of G.egg.pairs){ if(pr.mid.dot(dir)<Math.cos(R)) continue; near++; if(pr.cracked){already++; continue;}
     if(G.egg.pieces[pr.a].removed&&G.egg.pieces[pr.b].removed) continue;
     thinnest=Math.min(thinnest,pr.maxhp); pr.hp-=power; if(pr.hp<=0){pr.cracked=true; cracks++;} else hard++;}
   // membrane strain: spoon much more than needle; thin shell and a weak membrane make it worse; the air cell cushions it
-  // hidden bonus: once in a while the spoon lands just right and a whole area shatters with no strain at all
-  if(isSpoon&&G.egg.rng()<.06){ for(const pr of G.egg.pairs){ if(!pr.cracked&&pr.mid.dot(dir)>Math.cos(.95)){pr.cracked=true; pr.hp=0;} }
-    G.bonus+=60; G.flash=1; SFX.lucky(); buzz([20,30,20,30,60]); toast('会心の一撃！','殻が一気に割れた！',1.6); refreshCracks(); updateHud(); return; }
   let d=(isSpoon?SPOON_DMG:NEEDLE_DMG)*(isSpoon?T.spoonDmg:T.needleDmg)*E.mem*(thinnest<=1?1.3:thinnest>=3?.75:1);
   // a spoon on shell that is already broken hits the membrane directly: rough work early, needle work late
   if(isSpoon&&near) d*=1+2.2*(already/near);
@@ -459,34 +556,35 @@ function hitAt(p,dir){
   if(p.air&&!G.seenAir){G.seenAir=true; toast('気室！','丸い方の端には空気の部屋。ここは剥きやすい',1.8);}
   refreshCracks(); updateHud();
 }
+const nbrs=p=>p.nbr.map(pr=>G.egg.pieces[pr.a===p.i?pr.b:pr.a]);
 function peelAttempt(p){
   const T=tier(), s=crackedShare(p), mem=G.egg.E.mem;
+  if(p.keep){toast('ここは残す部分','金色の殻はそのまま',1); SFX.hard(); return;}
   if(isFree(p)){removePiece(p);
-    if(G.egg.rng()<.07){const chain=p.nbr.map(pr=>G.egg.pieces[pr.a===p.i?pr.b:pr.a]).filter(q=>!q.removed&&!q.keep&&crackedShare(q)>=.5);
+    if(G.egg.rng()<(R_('lucky')?.25:.07)){const chain=nbrs(p).filter(q=>!q.removed&&!q.keep&&crackedShare(q)>=.5);
       if(chain.length>=2){chain.forEach(q=>removePiece(q,true)); G.bonus+=40; SFX.lucky(); buzz([20,30,60]); toast('ズルッと一気に！',`${chain.length+1}枚まとめて剥けた`,1.5);}}
-    return;}
-  if(s>=T.partial){removePiece(p); addDamage(.8*T.peelDmg*mem,p.dir,false); return;}
+    afterPeel(); return;}
+  if(s>=T.partial){removePiece(p); addDamage(.8*T.peelDmg*mem,p.dir,false); afterPeel(); return;}
   // tapped a piece that is still held? take a ready neighbour instead, if there is one
-  const ready=p.nbr.map(pr=>G.egg.pieces[pr.a===p.i?pr.b:pr.a]).find(q=>!q.removed&&!q.keep&&(isFree(q)||crackedShare(q)>=T.partial));
-  if(ready&&G.kind!=='art'){peelAttempt(ready); return;}   // mostly cracked: it comes off, with a little tug on the membrane
+  const rd=nbrs(p).find(q=>!q.removed&&!q.keep&&ready(q));
+  if(rd){peelAttempt(rd); return;}
   addDamage((1.5+2.5*(1-s))*PEEL_FAIL*T.peelDmg*mem,p.dir,false); SFX.bad(); buzz([10,30,10]);
   toast('まだつながってる','まわりにひびを入れてから',1.2); updateHud();
 }
 function removePiece(p,quiet){
   const now=G.t; p.removed=true; G.removedArea+=p.area;
-  // the piece flies off as a flake
-  const m=p.mesh; const wp=new THREE.Vector3(); m.getWorldPosition(wp); scene.attach(m); m.material=m.material.clone(); m.material.transparent=true;
+  const m=p.mesh; scene.attach(m); m.material=m.material.clone(); m.material.transparent=true;   // the piece flies off as a flake
   const n=p.dir.clone().applyQuaternion(root.quaternion);
   G.flakes.push({m,v:n.multiplyScalar(1.6).add(new THREE.Vector3((Math.random()-.5)*.6,1.2,0)),w:new THREE.Vector3(Math.random()*6-3,Math.random()*6-3,Math.random()*6-3),life:1.4});
-  // combos and big pieces
-  if(now-G.lastPeel<1.6){G.combo++; if(G.combo>=3){SFX.combo(G.combo); G.bonus+=G.combo*4; floatTxt(`${G.combo} 連続！`);}} else G.combo=1;
+  if(now-G.lastPeel<1.6){G.combo++; if(G.combo>=3){SFX.combo(G.combo); G.bonus+=G.combo*4; toast(`${G.combo} 連続！`,'',.8);}} else G.combo=1;
   G.lastPeel=now;
-  if(quiet){} else if(p.big){SFX.peel(true); G.bonus+=25; toast('大物！','大きな一枚がきれいに剥けた',1.1); buzz(25);} else SFX.peel(false);
-  if(G.kind==='art'&&p.keep){addDamage(0,p.dir,false); toast('あっ、残す部分！','金色の部分は残してね',1.3);}
+  if(!quiet){ if(p.big){SFX.peel(true); G.bonus+=25; toast('大物！','大きな一枚がきれいに剥けた',1.1); buzz(25);} else SFX.peel(false);}
+}
+function afterPeel(){
   refreshCracks(); updateHud();
-  const left=G.egg.pieces.filter(q=>!q.removed&&!(G.kind==='art'&&q.keep)).length;
-  if(left===1&&G.kind!=='art'){G.slow=true; toast('最後の一枚','落ち着いて…',1.4);}
-  if(left===0&&G.kind!=='art') finish(true);
+  const left=G.egg.pieces.filter(q=>!q.removed&&!q.keep).length;
+  if(left===1){G.slow=true; toast('最後の一枚','落ち着いて…',1.4);}
+  if(left===0) finish(true);
 }
 function addDamage(d,dir,mark){
   if(G.done) return;
@@ -496,81 +594,69 @@ function addDamage(d,dir,mark){
   if(G.dmg>=100) finish(false);
 }
 
-/* ---------- egg art ---------- */
+/* ---------- egg art: the shape on the front of the egg ---------- */
 function artKeep(id,d){
-  if(d.z<.25) return false; const x=d.x/.62, y=(d.y)/.62;   // front of the egg, flattened
+  if(d.z<.2) return false; const x=d.x/.62, y=d.y/.62;   // front of the egg, flattened
   if(id==='circle') return x*x+y*y<.36;
   if(id==='heart'){const X=x*1.25, Y=y*1.25+.25; const q=X*X+Y*Y-1; return q*q*q-X*X*Y*Y*Y<0;}
-  if(id==='star'){const poly=[]; for(let k=0;k<10;k++){const r=k%2?.32:.72, a=k*Math.PI/5; poly.push([r*Math.sin(a),r*Math.cos(a)]);}
+  if(id==='star'){const poly=[]; for(let k=0;k<10;k++){const r=k%2?.34:.78, a=k*Math.PI/5; poly.push([r*Math.sin(a),r*Math.cos(a)-.04]);}
     let inside=false; for(let k=0,m=poly.length-1;k<poly.length;m=k++){const [xi,yi]=poly[k],[xj,yj]=poly[m]; if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi) inside=!inside;} return inside;}
-  if(id==='smile'){const eye=(cx)=>((x-cx)**2+(y-.25)**2)<.028; const mouth=Math.abs(Math.hypot(x,y+.05)-.42)<.09&&y<-.08; return eye(-.24)||eye(.24)||mouth;}
+  if(id==='smile'){const eye=(cx)=>((x-cx)**2+(y-.28)**2)<.035; const mouth=Math.abs(Math.hypot(x,y+.02)-.44)<.1&&y<-.1; return eye(-.26)||eye(.26)||mouth;}
   return false;
-}
-function artOutline(id){
-  const pts=[]; const N=240, o=new THREE.Vector3(), u=new THREE.Vector3();
-  const onEgg=(x,y)=>{x*=.62; y*=.62; const z=Math.sqrt(Math.max(0,1-x*x-y*y)); u.set(x,y,z).normalize(); shapeP(u,o).multiplyScalar(1.008); return o.clone();};
-  const loop=(fn)=>{for(let i=0;i<N;i++){const a=fn(i/N), b=fn((i+1)/N); pts.push(onEgg(a[0],a[1]),onEgg(b[0],b[1]));}};
-  if(id==='circle') loop(t=>[.6*Math.cos(t*2*Math.PI),.6*Math.sin(t*2*Math.PI)]);
-  if(id==='heart') loop(t=>{const a=t*2*Math.PI; return [(16*Math.sin(a)**3)/17/1.25, ((13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a))/17)/1.25-.05];});
-  if(id==='star') loop(t=>{const k=Math.floor(t*10), f=t*10-k, r0=k%2?.32:.72, r1=k%2?.72:.32, a0=k*Math.PI/5, a1=(k+1)*Math.PI/5; const r=lerp(r0,r1,f), a=lerp(a0,a1,f); return [r*Math.sin(a),r*Math.cos(a)];});
-  if(id==='smile'){loop(t=>[-.24+.17*Math.cos(t*2*Math.PI),.25+.17*Math.sin(t*2*Math.PI)]); loop(t=>[.24+.17*Math.cos(t*2*Math.PI),.25+.17*Math.sin(t*2*Math.PI)]); loop(t=>{const a=lerp(-2.6,-.55,t); return [.42*Math.cos(a),.42*Math.sin(a)-.05];});}
-  const g=new THREE.BufferGeometry().setFromPoints(pts);
-  const l=new THREE.LineSegments(g,new THREE.LineDashedMaterial({color:'#f2b632',dashSize:.04,gapSize:.03})); l.computeLineDistances(); l.renderOrder=4; return l;
-}
-function artScore(){
-  let keepT=0,keepOk=0,remT=0,remOk=0;
-  for(const p of G.egg.pieces){ if(p.keep){keepT++; if(!p.removed) keepOk++;} else {remT++; if(p.removed) remOk++;}}
-  return {keep:keepT?keepOk/keepT:1, rem:remT?remOk/remT:1};
 }
 
 /* ---------- finish & result ---------- */
-function finish(ok){
-  if(G.done) return; G.done=true; G.running=false; G.failed=!ok; G.finishT=0;
-  if(ok){SFX.wobble(); G.jiggle=1; setTimeout(()=>SFX.done(),450); buzz([30,40,60]);}
-  else {SFX.tear(); buzz([60,40,60]); G.membrane.material=membraneMat.clone(); G.membrane.material.color.set('#e9c98a'); toast('薄皮が破れた…','白身がとろ〜り。次は優しく',2);}
-  setTimeout(showResult,ok?2300:1700);
+function finish(ok,why){
+  if(G.done) return; G.done=true; G.running=false; G.failed=!ok; G.slow=false;
+  if(ok){SFX.wobble(); G.jiggle=1; setTimeout(()=>SFX.done(),450); buzz([30,40,60]); if(G.kind==='art') G.showcase=1;}
+  else {SFX.tear(); buzz([60,40,60]); G.membrane.material=membraneMat.clone(); G.membrane.material.color.set('#e9c98a'); toast(why||'薄皮が破れた…',why?'':'白身がとろ〜り。次は優しく',2);}
+  setTimeout(showResult,ok?(G.kind==='art'?2800:2300):1700);
 }
 function scoreOf(){
   const pct=Math.round(G.removedArea/G.egg.total*100), dmg=Math.round(G.dmg), t=Math.round(G.t);
+  if(G.kind==='art'){const score=G.failed?0:400+Math.round((100-dmg)*4)+Math.max(0,300-t)+G.bonus; const stars=G.failed?0:dmg<35&&t<=240?3:dmg<65?2:1; return {pct,dmg,t,score,stars};}
   let score=pct*6+Math.round((100-dmg)*3)+Math.max(0,(300-t))+G.bonus;
   let stars=0; if(!G.failed&&pct>=100){stars=1; if(dmg<60) stars=2; if(dmg<30&&t<=200) stars=3;}
-  if(G.kind==='art'){const a=artScore(); const acc=Math.round((a.keep*.6+a.rem*.4)*100); score=acc*8+Math.round((100-dmg)*2)+G.bonus; stars=G.failed?0:acc>=95?3:acc>=85?2:acc>=70?1:0; return {pct,dmg,t,score,stars,acc};}
   if(G.failed) score=Math.round(score*.3);
   return {pct,dmg,t,score,stars};
 }
 const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 function showResult(){
-  const r=scoreOf(), E=G.egg.E, Y=YOLKS[G.egg.yolk];
-  const before=rankIdx(); let newYolk=false;
-  if(!G.failed&&(r.pct>=100||G.kind==='art')){ S.xp+=Math.round(r.score/10);
-    if(G.kind!=='art'){const k=E.id+':'+G.egg.yolk; if(!S.zukan[k]) newYolk=true; S.zukan[k]=(S.zukan[k]||0)+1;}}
-  if(G.kind==='daily'){const b=S.daily[G.daily]; if(!b||r.score>b.score) S.daily[G.daily]={score:r.score,pct:r.pct,dmg:r.dmg,t:r.t,stars:r.stars,egg:E.id};}
+  const r=scoreOf(), E=G.egg.E, C=CONTENTS[G.egg.inside];
+  const before=rankIdx(); let newOne=false;
+  if(!G.failed){ S.xp+=Math.round(r.score/10*(E.xp||1));
+    if(G.kind!=='art'){S.cleared[E.id]=(S.cleared[E.id]||0)+1; const k=E.id+':'+G.egg.inside; if(!S.zukan[k]) newOne=true; S.zukan[k]=(S.zukan[k]||0)+1;}}
+  const unlockedNow=G.kind!=='art'&&!G.failed&&S.cleared[E.id]===1?EGGS[EGGS.indexOf(E)+1]:null;
+  if(G.kind==='daily'){S.daily[G.daily]={score:r.score,pct:r.pct,dmg:r.dmg,t:r.t,stars:r.stars,egg:E.id,rule:G.rule.id,ok:!G.failed};
+    const y=new Date(); y.setDate(y.getDate()-1); const yk=keyOf(y); S.streak={n:S.streak.last===yk?S.streak.n+1:1,last:G.daily};}
   if(G.kind==='art'&&!G.failed){const b=S.arts[G.art.id]; if(!b||r.stars>b) S.arts[G.art.id]=r.stars;}
   save();
-  $('rTitle').textContent=G.failed?'薄皮が破れた…':G.kind==='art'?(r.stars>=3?'見事なエッグアート！':'エッグアート完成'):(r.dmg<10?'神剥き！':'はだかになった！');
+  $('rTitle').textContent=G.failed?(R_('time90')&&G.t>=90?'時間切れ…':'薄皮が破れた…'):G.kind==='art'?(r.stars>=3?'見事なエッグアート！':'エッグアート完成！'):(r.dmg<10?'神剥き！':'はだかになった！');
   $('rStars').innerHTML=[0,1,2].map(i=>`<span class="${i<r.stars?'':'off'}">★</span>`).join('');
-  $('rStats').innerHTML=G.kind==='art'
-    ?`<div><b>${r.acc}%</b><span>形の正確さ</span></div><div><b>${r.dmg}%</b><span>薄皮の傷</span></div><div><b>${fmtT(r.t)}</b><span>タイム</span></div>`
-    :`<div><b>${r.pct}%</b><span>剥けた割合</span></div><div><b>${r.dmg}%</b><span>薄皮の傷</span></div><div><b>${fmtT(r.t)}</b><span>タイム</span></div>`;
+  $('rStats').innerHTML=`<div><b>${r.pct}%</b><span>剥けた割合</span></div><div><b>${r.dmg}%</b><span>薄皮の傷</span></div><div><b>${fmtT(r.t)}</b><span>タイム</span></div>`;
   const sp=$('rSurprise');
-  if(G.kind!=='art'&&!G.failed){sp.hidden=false; const yk=Y.n>1?`radial-gradient(circle at 35% 40%,${Y.color} 0 30%,transparent 31%),radial-gradient(circle at 68% 62%,${Y.color} 0 30%,transparent 31%)`:Y.color;
-    sp.innerHTML=`<div class="yk" style="background:${yk}"></div><div>${newYolk?'<span class="new">図鑑に新しく登録！</span>':''}<b>中身は「${Y.name}」</b><p>${Y.fact}</p></div>`;}
-  else sp.hidden=true;
-  const after=rankIdx(); const rr=$('rRank'); rr.hidden=after<=before; if(after>before) rr.textContent=`職人ランクが「${RANKS[after].name}」に！ 道具が良くなった`;
+  if(G.kind!=='art'){sp.hidden=false; sp.innerHTML=`${contentIcon(G.egg.inside)}<div>${newOne?'<span class="new">図鑑に新しく登録！</span>':''}<b>中身は「${C.name}」</b><p>${C.fact}</p></div>`;} else sp.hidden=true;
+  const after=rankIdx(); const rr=$('rRank'); const notes=[];
+  if(after>before) notes.push(`職人ランクが「${RANKS[after].name}」に！ 道具が良くなった`);
+  if(unlockedNow) notes.push(`新しい卵「${unlockedNow.name}」が届いた！`);
+  rr.hidden=!notes.length; rr.innerHTML=notes.join('<br>');
   const sh=$('rShare'); sh.hidden=G.kind!=='daily';
-  if(G.kind==='daily') $('rShareText').textContent=`はだかのたまご 今日の卵 ${G.daily}\n${E.name}　剥けた ${r.pct}%　薄皮の傷 ${r.dmg}%　${fmtT(r.t)}\n${'★'.repeat(r.stars)}${'☆'.repeat(3-r.stars)}　${r.score}点`;
-  $('rAgain').textContent=G.kind==='daily'?'もう一度挑戦':G.kind==='art'?'別のお題':'もう1個';
+  if(G.kind==='daily') $('rShareText').textContent=shareText();
+  $('rAgain').hidden=G.kind==='daily';
+  $('rAgain').textContent=G.kind==='art'?'別のお題':'もう1個';
   showScreen('result'); $('hud').hidden=true;
 }
+function shareText(){const d=S.daily[G.daily||todayKey()]; if(!d) return ''; const E=EGGS.find(e=>e.id===d.egg), R=RULES.find(x=>x.id===d.rule);
+  return `はだかのたまご 今日の卵 ${G.daily||todayKey()}\n${E.name}（${R.name}）\n${d.ok?`剥けた ${d.pct}%　薄皮の傷 ${d.dmg}%　${fmtT(d.t)}`:'失敗…'}\n${'★'.repeat(d.stars)}${'☆'.repeat(3-d.stars)}　${d.score}点　連続${S.streak.n}日`;}
 
 /* ---------- HUD ---------- */
 function updateHud(){
   if(!G.egg) return;
   const pct=Math.round(G.removedArea/G.egg.total*100);
   $('hDmg').style.width=G.dmg+'%'; $('hGauge').classList.toggle('hot',G.dmg>75);
-  const ready=G.egg.pieces.filter(p=>!p.removed&&!p.keep&&(isFree(p)||crackedShare(p)>=tier().partial)).length;
-  $('hHint').textContent=ready?`光っている破片 ${ready}枚 → ピンセットで剥がせる`:'ドラッグで回転 ・ ピンチで拡大';
-  if(G.kind==='art'){const a=artScore(); $('hPct').textContent=`形 ${Math.round((a.keep*.6+a.rem*.4)*100)}%`;} else $('hPct').textContent=`剥けた ${pct}%`;
+  const rd=G.egg.pieces.filter(p=>!p.removed&&!p.keep&&ready(p)).length;
+  $('hHint').textContent=R_('noglow')?'剥がせる破片を見極めよう':rd?`光っている破片 ${rd}枚 → ピンセットで剥がせる`:'ドラッグで回転 ・ ピンチで拡大';
+  if(G.kind==='art'){const left=G.egg.pieces.filter(q=>!q.removed&&!q.keep).length; $('hPct').textContent=`残り ${left}枚`;} else $('hPct').textContent=`剥けた ${pct}%`;
   const T=tier(); $('tnSpoon').textContent=T.spoon; $('tnNeedle').textContent=T.needle; $('tnTweezers').textContent=T.tweezers;
 }
 function setTool(t){G.tool=t; document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t?'true':'false'));}
@@ -578,42 +664,36 @@ const TOOLTIP={spoon:['スプーン','広く割れる。薄皮への負担は大
 document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{audio(); setTool(b.dataset.tool); SFX.needle(0); const t=TOOLTIP[b.dataset.tool]; toast(t[0],t[1],1.1);});
 $('hHelp').onclick=()=>{G.running=false; $('help').hidden=false;};
 $('helpClose').onclick=()=>{$('help').hidden=true; if(G.egg&&!G.done) G.running=true;};
-
+$('hCandle').onclick=()=>{if(G.running) candle(1.8,false);};
 let toastT=null;
 function toast(big,small,dur=1.2){$('tBig').textContent=big; $('tSmall').textContent=small||''; $('toast').style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>$('toast').style.opacity=0,dur*1000);}
-function floatTxt(t){toast(t,'',.8);}
-function tipTour(){
-  const steps=[['スプーンでコツン','広い範囲にひびが入る。でも薄皮には負担大'],['針でチクッ','狭い範囲に、やさしくひびを入れる'],['ピンセットで剥がす','まわりが全部ひび割れて、浮いた破片をタップ'],['薄皮ゲージに注意','満タンになると薄皮が破れて失敗']];
-  steps.forEach((s,i)=>setTimeout(()=>{if(G.running) toast(s[0],s[1],2.3);},i*2500+300));
-}
 
-/* ---------- input: drag to turn, tap to use the tool, long-press to peel slowly, pinch to zoom ---------- */
+/* ---------- input: drag to turn, tap to use the tool, pinch to zoom ---------- */
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
-const pts=new Map(); let down=null, pinch0=0, zoom0=1, holdTimer=null;
+const pts=new Map(); let down=null, pinch0=0, zoom0=1;
 function pick(x,y){
   const r=canvas.getBoundingClientRect(); ndc.set((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1); ray.setFromCamera(ndc,camera);
   const meshes=G.egg.pieces.filter(p=>!p.removed).map(p=>p.mesh); const hit=ray.intersectObjects(meshes,false)[0]; if(!hit) return null;
-  const local=eggGroup.worldToLocal(hit.point.clone()); const dir=unshape(local,new THREE.Vector3());
-  return {piece:hit.object.userData.piece,dir};
+  const local=eggGroup.worldToLocal(hit.point.clone()); return {piece:hit.object.userData.piece,dir:unshape(local,new THREE.Vector3())};
 }
 canvas.addEventListener('pointerdown',e=>{
   audio(); if(G.mode!=='play'||!G.running) return; canvas.setPointerCapture(e.pointerId);
   pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pts.size===2){const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); zoom0=G.zoom; down=null; clearTimeout(holdTimer); return;}
-  down={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,t:performance.now(),moved:false,held:false};
+  if(pts.size===2){const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); zoom0=G.zoom; down=null; return;}
+  down={x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,moved:false};
 });
 canvas.addEventListener('pointermove',e=>{
   if(!pts.has(e.pointerId)) return; pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pts.size===2){const [a,b]=[...pts.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); G.zoom=clamp(zoom0*d/pinch0,.8,2.6); fitCamera(); return;}
+  if(pts.size===2){const [a,b]=[...pts.values()]; G.zoom=clamp(zoom0*Math.hypot(a.x-b.x,a.y-b.y)/pinch0,.8,2.6); fitCamera(); return;}
   if(!down) return; const dx=e.clientX-down.lx, dy=e.clientY-down.ly;
-  if(!down.moved&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>8){down.moved=true; clearTimeout(holdTimer);}
-  if(down.moved){const q=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),dx*.009); const q2=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),dy*.009); root.quaternion.premultiply(q).premultiply(q2);}
+  if(!down.moved&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>8) down.moved=true;
+  if(down.moved){root.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),dx*.009)).premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),dy*.009));}
   down.lx=e.clientX; down.ly=e.clientY;
 });
 const up=e=>{
-  pts.delete(e.pointerId); clearTimeout(holdTimer);
+  pts.delete(e.pointerId);
   if(!down||G.mode!=='play'||!G.running){if(pts.size<2) down=null; return;}
-  const d=down; down=null; if(d.moved||d.held) return;
+  const d=down; down=null; if(d.moved) return;
   const h=pick(d.x,d.y); if(!h) return;
   if(G.tool==='tweezers') peelAttempt(h.piece); else hitAt(h.piece,h.dir);
 };
@@ -622,79 +702,94 @@ canvas.addEventListener('wheel',e=>{if(G.mode!=='play') return; e.preventDefault
 
 /* ---------- loop ---------- */
 let last=performance.now();
+const qFront=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.05,0,0));
 function frame(now){
   const rdt=Math.min(.05,(now-last)/1000); last=now;
   const W=canvas.clientWidth,H=canvas.clientHeight; if(canvas.width!==Math.floor(W*renderer.getPixelRatio())||canvas.height!==Math.floor(H*renderer.getPixelRatio())){renderer.setSize(W,H,false); camera.aspect=W/H; camera.updateProjectionMatrix();}
-  if(G.running){G.t+=rdt; $('hTime').textContent=fmtT(G.t);}
-  shellLift.emissiveIntensity=G.tool==='tweezers'?.45+.2*Math.sin(now/180):.4;
-  if(G.flash>0){G.flash=Math.max(0,G.flash-rdt*2.5); renderer.toneMappingExposure=1.05+G.flash*.8;}
-  // idle spin on menus
-  if(G.mode!=='play'&&eggGroup) root.rotateOnWorldAxis(new THREE.Vector3(0,1,0),rdt*.35);
-  // last piece: everything eases in
+  if(G.running){G.t+=rdt; $('hTime').textContent=R_('time90')?`残り ${fmtT(Math.max(0,90-G.t))}`:fmtT(G.t); if(R_('time90')&&G.t>=90) finish(false,'時間切れ…');}
+  // thunder eggs crack on their own now and then
+  if(G.running&&G.egg&&G.egg.E.zap){G.zapT-=rdt; if(G.zapT<=0){G.zapT=G.egg.E.zap; const left=G.egg.pieces.filter(p=>!p.removed); if(left.length){const p=left[Math.floor(Math.random()*left.length)]; if(crackAround(p.dir,.35)){G.flash=.6; SFX.zap(); toast('バチッ！','雷で殻が割れた',.9); refreshCracks(); updateHud();}}}}
+  if(G.liftMat) G.liftMat.emissiveIntensity=G.tool==='tweezers'?.45+.2*Math.sin(now/180):.4;
+  if(G.candleT>0){G.candleT=Math.max(0,G.candleT-rdt);} G.candle=lerp(G.candle,G.candleT>0?1:0,Math.min(1,rdt*6)); if(G.egg&&G.mode==='play') applyCandle(G.candle);
+  renderer.toneMappingExposure=1.05+G.flash*.8; if(G.flash>0) G.flash=Math.max(0,G.flash-rdt*2.5);
+  if(G.mode!=='play'&&eggGroup) root.rotateOnWorldAxis(new THREE.Vector3(0,1,0),rdt*.35);   // idle spin behind menus
+  if(G.showcase>0){root.quaternion.slerp(qFront,Math.min(1,rdt*3));}     // finished egg art turns to face you
   const targetZ=(G.slow&&!G.done?1.35:1);
   camera.zoomBoost=lerp(camera.zoomBoost||1,targetZ,Math.min(1,rdt*2)); if(G.egg){const s=G.egg.E.scale; camera.position.z=baseDist(s)/(G.zoom*camera.zoomBoost); scene.fog.near=camera.position.z+1.5*s; scene.fog.far=camera.position.z+9*s;}
-  // flakes
   for(const f of G.flakes){f.life-=rdt; f.v.y-=4.5*rdt; f.m.position.addScaledVector(f.v,rdt); f.m.rotation.x+=f.w.x*rdt; f.m.rotation.y+=f.w.y*rdt; f.m.material.opacity=clamp(f.life,0,1); if(f.life<=0) scene.remove(f.m);}
   G.flakes=G.flakes.filter(f=>f.life>0);
-  // the naked egg wobbles when done
+  if(G.contents){const u=G.contents.userData; if(u.spin) G.contents.rotation.y+=rdt*u.spin; if(u.breathe) G.contents.scale.setScalar(1+.03*Math.sin(now/600));
+    if(u.look){const cp=camera.position.clone(); G.contents.parent.worldToLocal(cp); G.contents.lookAt(cp);}}
   if(G.jiggle>0&&eggGroup){G.jiggle=Math.max(0,G.jiggle-rdt*.45); const w=Math.sin(now/1000*14)*.06*G.jiggle; const s=G.egg.E.scale; eggGroup.scale.set(s*(1+w),s*(1-w*.8),s*(1+w));}
   renderer.render(scene,camera);
   requestAnimationFrame(frame);
 }
 
 /* ---------- menus ---------- */
-function showScreen(id){['title','pick','zukan','result'].forEach(s=>$(s).hidden=s!==id); G.mode=id?'menu':'play'; if(id) $('hud').hidden=true;}
+function showScreen(id){['title','pick','zukan','result','help'].forEach(s=>$(s).hidden=s!==id); G.mode=id?'menu':'play'; if(id){$('hud').hidden=true; applyCandle(0);}}
+function keyOf(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function todayKey(){return keyOf(new Date());}
 function renderTitle(){
   const r=rankIdx(), cur=RANKS[r], nx=RANKS[r+1];
   $('rankBox').innerHTML=`<div class="row"><span>職人ランク</span><b>${cur.name}</b></div><div class="meter"><i style="width:${nx?clamp((S.xp-cur.xp)/(nx.xp-cur.xp)*100,0,100):100}%"></i></div><div class="next">${nx?`次の「${nx.name}」まで ${nx.xp-S.xp} 点 ・ 道具が良くなる`:'最高ランク。すべての道具が金色に'}</div>`;
   $('mSound').textContent='音：'+(S.sound?'オン':'オフ');
-  const today=todayKey(); $('mDaily').textContent=S.daily[today]?`今日の卵（${S.daily[today].score}点）`:'今日の卵';
+  const d=S.daily[todayKey()]; $('mDaily').textContent=d?`今日の卵（挑戦済み・${d.score}点）`:'今日の卵';
   showScreen('title'); menuEgg();
 }
 function menuEgg(){ // a slowly turning egg behind the title
-  const E=EGGS[1]; clearEgg(); G.egg=buildEgg(E,7); eggGroup=new THREE.Group(); root.add(eggGroup);
-  for(const p of G.egg.pieces){p.mesh=new THREE.Mesh(p.geo,shellMat); eggGroup.add(p.mesh);}
-  root.quaternion.setFromEuler(new THREE.Euler(-.15,0,.12)); G.zoom=1.15; fitCamera();
+  const E=EGGS[1]; clearEgg(); G.egg=buildEgg(E,7); G.shellMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.62}); eggGroup=new THREE.Group(); root.add(eggGroup);
+  for(const p of G.egg.pieces){p.mesh=new THREE.Mesh(p.geo,G.shellMat); eggGroup.add(p.mesh);}
+  G.contents=null; root.quaternion.setFromEuler(new THREE.Euler(-.15,0,.12)); G.zoom=1.15; fitCamera();
 }
-function eggSwatch(E){return `rgb(${E.shell.join(',')})`;}
+function swatch(E){const c=`rgb(${E.shell.join(',')})`;
+  const extra={spots:'background-image:radial-gradient(circle at 30% 40%,#6b4a30 0 8%,transparent 9%),radial-gradient(circle at 65% 65%,#6b4a30 0 10%,transparent 11%)',
+    scales:'background-image:radial-gradient(circle at 30% 30%,rgba(0,0,0,.25) 0 12%,transparent 13%),radial-gradient(circle at 70% 60%,rgba(0,0,0,.25) 0 12%,transparent 13%)',
+    stars:'background-image:radial-gradient(circle at 30% 35%,#fff 0 4%,transparent 5%),radial-gradient(circle at 65% 60%,#fff 0 4%,transparent 5%)',
+    zigzag:'background-image:linear-gradient(170deg,transparent 45%,#4b3a8a 46% 54%,transparent 55%)'}[E.pattern]||'';
+  return `<div class="eggdot" style="background:${c};${extra}${E.metal?';box-shadow:inset -5px -6px 0 rgba(0,0,0,.15),inset 4px 4px 0 rgba(255,255,255,.5)':''}"></div>`;}
 function openPick(){
-  $('pTitle').textContent='卵を選ぶ'; $('pNote').textContent='職人ランクが上がると、新しい卵が届きます。';
-  const r=rankIdx();
-  $('pCards').innerHTML=EGGS.map((E,i)=>{const lock=E.rank>r; const b=S.best[E.id];
-    return `<button class="card${lock?' lock':''}" data-egg="${i}"><div class="eggdot" style="background:${eggSwatch(E)}${E.spots?';background-image:radial-gradient(circle at 30% 40%,#6b4a30 0 8%,transparent 9%),radial-gradient(circle at 65% 65%,#6b4a30 0 10%,transparent 11%)':''}"></div><div class="nm">${E.name}</div><div class="ds">${E.desc}</div>${lock?`<div class="lk">「${RANKS[E.rank].name}」で解放</div>`:''}</button>`;}).join('');
-  document.querySelectorAll('[data-egg]').forEach(b=>b.onclick=()=>{audio(); const E=EGGS[+b.dataset.egg]; startEgg(E,(Math.random()*1e9)|0,'free');});
+  $('pTitle').textContent='卵を選ぶ'; $('pNote').textContent='卵をクリアすると、次の卵が届きます。後半は魔物の卵。';
+  $('pCards').innerHTML=EGGS.map((E,i)=>{const lock=!unlocked(i), n=S.cleared[E.id]||0;
+    return `<button class="card${lock?' lock':''}${E.monster?' mon':''}" data-egg="${i}">${swatch(E)}<div class="nm">${lock&&E.monster?'？？？の卵':E.name}</div><div class="ds">${lock&&E.monster?'正体不明の卵。':E.desc}</div>${lock?`<div class="lk">「${EGGS[i-1].name}」をクリアで解放</div>`:`<div class="lk">${n?`クリア ${n}回`:'未クリア'}</div>`}</button>`;}).join('');
+  document.querySelectorAll('[data-egg]').forEach(b=>b.onclick=()=>{audio(); startEgg(EGGS[+b.dataset.egg],(Math.random()*1e9)|0,'free');});
   showScreen('pick');
 }
 function openArt(){
-  $('pTitle').textContent='エッグアート'; $('pNote').textContent='金色の点線の内側を残して、ほかの殻を全部剥きます。残す部分を剥いてしまうと減点。できたら「完成！」。';
+  $('pTitle').textContent='エッグアート'; $('pNote').textContent='殻の割れ目が、お題の形の輪郭に沿っています。金色の部分は残し、ほかの殻を全部剥くと完成。金色の殻は触っても剥がれません。';
   $('pCards').innerHTML=ARTS.map((A,i)=>`<button class="card" data-art="${i}"><div class="nm">${A.name}</div><div class="ds">${A.desc}</div><div class="lk">${S.arts[A.id]?'★'.repeat(S.arts[A.id]):'未挑戦'}</div></button>`).join('');
   document.querySelectorAll('[data-art]').forEach(b=>b.onclick=()=>{audio(); startEgg(EGGS[1],(Math.random()*1e9)|0,'art',{art:ARTS[+b.dataset.art]});});
   showScreen('pick');
 }
-function todayKey(){const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function startDaily(){
-  const k=todayKey(), h=hashStr('daily'+k), pool=[0,1,1,1,2,3];   // the same egg and cracks for everyone today
-  startEgg(EGGS[pool[h%pool.length]],h,'daily',{daily:k});
+// today's egg: the same egg, cracks, contents and rule for everyone, and one try a day
+function todaysPlan(){const k=todayKey(), h=hashStr('daily'+k); return {k,h,E:EGGS[h%EGGS.length],R:RULES[(h>>>8)%RULES.length]};}
+function openDaily(){
+  const {k,h,E,R}=todaysPlan(), d=S.daily[k];
+  $('pTitle').textContent='今日の卵'; $('pNote').textContent='今日の卵は全員共通。ひび割れ方も中身も同じです。挑戦は1日1回だけ。ふだんは届かない魔物の卵が出る日も。';
+  $('pCards').innerHTML=`<div class="card wide${E.monster?' mon':''}">${swatch(E)}<div class="nm">${k}　${E.name}</div><div class="rule">今日のルール：${R.name}</div><div class="ds">${R.desc}</div>
+    ${d?`<div class="share"><pre>${shareText()}</pre></div><button class="btn sub sm" id="dCopy">結果をコピー</button><div class="ds">また明日！</div>`:`<button class="btn" id="dGo">挑戦する（1日1回）</button>`}</div>
+    <div class="card wide"><div class="streak">連続挑戦 ${S.streak.n}日</div></div>`;
+  if($('dGo')) $('dGo').onclick=()=>{audio(); startEgg(E,h,'daily',{daily:k,rule:R});};
+  if($('dCopy')) $('dCopy').onclick=()=>copyText(shareText());
+  showScreen('pick');
 }
 function openZukan(){
   let found=0,all=0;
-  $('zList').innerHTML=EGGS.map(E=>`<div><h3>${E.name}</h3><div class="zrow">${E.yolks.map(([y])=>{all++; const k=E.id+':'+y, has=S.zukan[k]; if(has) found++; const Y=YOLKS[y];
-    const bg=Y.n>1?`radial-gradient(circle at 35% 40%,${Y.color} 0 28%,transparent 29%),radial-gradient(circle at 68% 62%,${Y.color} 0 28%,transparent 29%),rgba(255,255,255,.08)`:Y.color;
-    return `<div class="zi"><div class="yk" style="${has?`background:${bg}`:''}">${has?'':'？'}</div>${has?Y.name:'？？？'}${has?`<br>×${has}`:''}</div>`;}).join('')}</div></div>`).join('');
+  $('zList').innerHTML=EGGS.map((E,i)=>`<div><h3>${unlocked(i)||S.cleared[E.id]?E.name:'？？？の卵'}</h3><div class="zrow">${E.contents.map(([id])=>{all++; const k=E.id+':'+id, has=S.zukan[k]; if(has) found++; const C=CONTENTS[id];
+    return `<div class="zi">${has?contentIcon(id):'<span class="yk">？</span>'}${has?C.name:'？？？'}${has?`<br>×${has}`:''}</div>`;}).join('')}</div></div>`).join('');
   $('zCount').textContent=`${found} / ${all}`;
   showScreen('zukan');
 }
+function copyText(t){navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>toast('コピーしました','',1)).catch(()=>{});}
 $('mPeel').onclick=()=>{audio(); openPick();};
 $('mArt').onclick=()=>{audio(); openArt();};
-$('mDaily').onclick=()=>{audio(); startDaily();};
+$('mDaily').onclick=()=>{audio(); openDaily();};
 $('mZukan').onclick=()=>{audio(); openZukan();};
 $('mSound').onclick=()=>{S.sound=!S.sound; save(); renderTitle();};
 $('pBack').onclick=$('zBack').onclick=()=>renderTitle();
 $('hBack').onclick=()=>{G.running=false; $('hud').hidden=true; renderTitle();};
-$('finishArt').onclick=()=>{if(G.kind==='art'&&G.running) finish(true);};
 $('rMenu').onclick=()=>renderTitle();
-$('rAgain').onclick=()=>{ if(G.kind==='daily') startDaily(); else if(G.kind==='art') openArt(); else startEgg(G.egg.E,(Math.random()*1e9)|0,'free'); };
-$('rCopy').onclick=()=>{const t=$('rShareText').textContent; navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>toast('コピーしました','',1)).catch(()=>{const r=document.createRange(); r.selectNodeContents($('rShareText')); const s=getSelection(); s.removeAllRanges(); s.addRange(r);});};
+$('rAgain').onclick=()=>{ if(G.kind==='art') openArt(); else startEgg(G.egg.E,(Math.random()*1e9)|0,'free'); };
+$('rCopy').onclick=()=>copyText($('rShareText').textContent);
 
 renderTitle();
 requestAnimationFrame(t=>{last=t; frame(t);});
