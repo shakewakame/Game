@@ -144,7 +144,7 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
         <span class="chip" id="hTime">0:00</span>
       </div>
       <div class="gauge" id="hGauge">薄皮 <span class="g"><i id="hDmg"></i></span> <span id="hPct">剥けた 0%</span></div>
-      <div class="goalrow"><span class="goal" id="hGoal"></span><button class="chip" id="hCandle">透かす</button></div>
+      <div class="goalrow"><span class="goal" id="hGoal"></span></div>
       <div class="inside" id="hInside"></div>
     </div>
     <div class="bottom">
@@ -477,7 +477,7 @@ function clearEgg(){ if(eggGroup){root.remove(eggGroup); eggGroup.traverse(o=>{i
 const R_=id=>G.rule&&G.rule.id===id;
 
 function startEgg(E,seed,kind='free',extra={}){
-  clearEgg();
+  clearTimeout(G.resTimer); clearEgg();
   G.kind=kind; G.art=extra.art||null; G.daily=extra.daily||null; G.rule=extra.rule||null;
   const egg=buildEgg(E,seed,{pieces:kind==='art'?70:undefined,art:G.art&&G.art.id,many:R_('many')});
   G.egg=egg;
@@ -500,10 +500,9 @@ function startEgg(E,seed,kind='free',extra={}){
   showScreen(null); $('hud').hidden=false; $('hName').textContent=E.name;
   $('hGoal').textContent=kind==='art'?`お題「${G.art.name}」：金色の部分を残して、ほかを剥く`:kind==='daily'?`今日の卵：${G.rule.name}`:'殻を全部剥いて、はだかの卵に';
   const C=CONTENTS[egg.inside], rare=isRare(E,egg.inside);
-  $('hInside').innerHTML=kind==='art'?'':`中身：${C.name}${rare?' <span class="rare">レア！</span>':''}`;
+  $('hInside').innerHTML=''; G.seen=false;
   updateHud();
   if(!S.tips){S.tips=true; save(); G.running=false; $('help').hidden=false;}
-  if(kind!=='art') candle(2.4,true);
 }
 // candling (検卵): light from inside makes the shell glow and shows what is in the egg
 function candle(sec,intro){G.candleT=sec; SFX.candle(); if(intro){const C=CONTENTS[G.egg.inside]; toast(C.kind==='none'?'検卵：あれ、空っぽ…？':`検卵：${C.name}！`,isRare(G.egg.E,G.egg.inside)?'めずらしい中身。慎重に剥こう':'光にかざすと、中身が透けて見える',2);}}
@@ -529,9 +528,9 @@ function refreshCracks(){
   for(const p of egg.pieces){ if(p.removed) continue; const f=!p.keep&&ready(p); p.mesh.position.copy(p.dir).multiplyScalar(f&&glow?.035:f?.012:0);
     p.mesh.material=p.keep?keepMat:(f&&glow?G.liftMat:G.shellMat);}
 }
-function crackedShare(p){let c=0,n=0; for(const pr of p.nbr){const other=G.egg.pieces[pr.a===p.i?pr.b:pr.a]; if(other.removed) continue; n++; if(pr.cracked) c++;} return n?c/n:1;}
+function crackedShare(p){let c=0,n=0; for(const pr of p.nbr){const other=G.egg.pieces[pr.a===p.i?pr.b:pr.a]; n++; if(pr.cracked||other.removed) c++;} return n?c/n:1;}
 function isFree(p){const s=crackedShare(p); return p.air?s>=.5:s>=1;}
-function ready(p){return isFree(p)||crackedShare(p)>=tier().partial;}
+function ready(p){if(p.ready) return true; if(isFree(p)||crackedShare(p)>=tier().partial){p.ready=true; return true;} return false;}
 
 /* ---------- actions ---------- */
 function crackAround(dir,R){let n=0; for(const pr of G.egg.pairs){ if(!pr.cracked&&pr.mid.dot(dir)>Math.cos(R)){pr.cracked=true; pr.hp=0; n++;}} return n;}
@@ -560,11 +559,11 @@ const nbrs=p=>p.nbr.map(pr=>G.egg.pieces[pr.a===p.i?pr.b:pr.a]);
 function peelAttempt(p){
   const T=tier(), s=crackedShare(p), mem=G.egg.E.mem;
   if(p.keep){toast('ここは残す部分','金色の殻はそのまま',1); SFX.hard(); return;}
-  if(isFree(p)){removePiece(p);
+  if(isFree(p)||(p.ready&&crackedShare(p)>=.999)){removePiece(p);
     if(G.egg.rng()<(R_('lucky')?.25:.07)){const chain=nbrs(p).filter(q=>!q.removed&&!q.keep&&crackedShare(q)>=.5);
       if(chain.length>=2){chain.forEach(q=>removePiece(q,true)); G.bonus+=40; SFX.lucky(); buzz([20,30,60]); toast('ズルッと一気に！',`${chain.length+1}枚まとめて剥けた`,1.5);}}
     afterPeel(); return;}
-  if(s>=T.partial){removePiece(p); addDamage(.8*T.peelDmg*mem,p.dir,false); afterPeel(); return;}
+  if(s>=T.partial||p.ready){removePiece(p); addDamage(.8*T.peelDmg*mem,p.dir,false); afterPeel(); return;}
   // tapped a piece that is still held? take a ready neighbour instead, if there is one
   const rd=nbrs(p).find(q=>!q.removed&&!q.keep&&ready(q));
   if(rd){peelAttempt(rd); return;}
@@ -610,7 +609,7 @@ function finish(ok,why){
   if(G.done) return; G.done=true; G.running=false; G.failed=!ok; G.slow=false;
   if(ok){SFX.wobble(); G.jiggle=1; setTimeout(()=>SFX.done(),450); buzz([30,40,60]); if(G.kind==='art') G.showcase=1;}
   else {SFX.tear(); buzz([60,40,60]); G.membrane.material=membraneMat.clone(); G.membrane.material.color.set('#e9c98a'); toast(why||'薄皮が破れた…',why?'':'白身がとろ〜り。次は優しく',2);}
-  setTimeout(showResult,ok?(G.kind==='art'?2800:2300):1700);
+  G.resTimer=setTimeout(showResult,ok?(G.kind==='art'?2800:2300):1700);
 }
 function scoreOf(){
   const pct=Math.round(G.removedArea/G.egg.total*100), dmg=Math.round(G.dmg), t=Math.round(G.t);
@@ -653,6 +652,9 @@ function shareText(){const d=S.daily[G.daily||todayKey()]; if(!d) return ''; con
 function updateHud(){
   if(!G.egg) return;
   const pct=Math.round(G.removedArea/G.egg.total*100);
+  // once enough shell is off, what is inside shows through the membrane and gets a name
+  if(G.kind!=='art'&&!G.seen&&pct>=35){G.seen=true; const C=CONTENTS[G.egg.inside], rare=isRare(G.egg.E,G.egg.inside);
+    $('hInside').innerHTML=`中身：${C.name}${rare?' <span class="rare">レア！</span>':''}`; toast(C.kind==='none'?'あれ、黄身が見えない…？':'中身が見えてきた！',`${C.name}${rare?'（レア！）':''}`,1.8);}
   $('hDmg').style.width=G.dmg+'%'; $('hGauge').classList.toggle('hot',G.dmg>75);
   const rd=G.egg.pieces.filter(p=>!p.removed&&!p.keep&&ready(p)).length;
   $('hHint').textContent=R_('noglow')?'剥がせる破片を見極めよう':rd?`光っている破片 ${rd}枚 → ピンセットで剥がせる`:'ドラッグで回転 ・ ピンチで拡大';
@@ -664,7 +666,6 @@ const TOOLTIP={spoon:['スプーン','広く割れる。薄皮への負担は大
 document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>{audio(); setTool(b.dataset.tool); SFX.needle(0); const t=TOOLTIP[b.dataset.tool]; toast(t[0],t[1],1.1);});
 $('hHelp').onclick=()=>{G.running=false; $('help').hidden=false;};
 $('helpClose').onclick=()=>{$('help').hidden=true; if(G.egg&&!G.done) G.running=true;};
-$('hCandle').onclick=()=>{if(G.running) candle(1.8,false);};
 let toastT=null;
 function toast(big,small,dur=1.2){$('tBig').textContent=big; $('tSmall').textContent=small||''; $('toast').style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>$('toast').style.opacity=0,dur*1000);}
 
