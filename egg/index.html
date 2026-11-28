@@ -124,6 +124,19 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
 .surprise .new{color:var(--yolk);font-size:.75rem;font-weight:900}
 .res .btns{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
 .res .btns .btn:first-child:not([hidden]){grid-column:1/-1}
+.starnote{display:flex;flex-direction:column;gap:.2rem;font-size:.78rem;background:rgba(255,255,255,.05);border-radius:12px;padding:.5rem .7rem}
+.starnote div{display:flex;justify-content:space-between;gap:.5rem}
+.starnote .ok{color:var(--yolk);font-weight:700}
+.starnote .ng{color:var(--muted)}
+.rank{cursor:pointer}
+.rlist{display:flex;flex-direction:column;gap:.6rem}
+.rl{background:rgba(251,246,236,.07);border-radius:14px;padding:.7rem .9rem;border:2px solid transparent}
+.rl.cur{border-color:var(--yolk)}
+.rl.lock{opacity:.6}
+.rl .h{display:flex;justify-content:space-between;align-items:baseline;font-weight:900}
+.rl .h b{font-size:1.05rem}
+.rl .h span{font-size:.75rem;color:var(--muted)}
+.rl ul{margin:.35rem 0 0;padding-left:1.1rem;font-size:.82rem;line-height:1.6}
 .res .rankup{text-align:center;color:var(--yolk);font-weight:900}
 .share{display:flex;flex-direction:column;gap:.4rem}
 .share pre{margin:0;font-family:var(--font);font-size:.85rem;background:rgba(0,0,0,.3);border-radius:10px;padding:.6rem;white-space:pre-wrap;user-select:text;-webkit-user-select:text}
@@ -135,6 +148,7 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
 .zi{width:64px;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-size:.6rem;color:var(--muted);text-align:center;line-height:1.3}
 .zi .yk{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;font-weight:900;color:rgba(255,255,255,.3)}
 .note{font-size:.78rem;color:var(--muted);line-height:1.6}
+.note em{font-style:normal;font-weight:700;color:#ffe3a1}
 .helpcards{display:flex;flex-direction:column;gap:.6rem}
 .hc{background:rgba(251,246,236,.07);border-radius:14px;padding:.75rem .9rem}
 .hc b{color:var(--yolk);font-size:1rem}
@@ -195,6 +209,12 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
     <div class="zk" id="zList"></div>
   </section>
 
+  <section class="screen" id="ranks" hidden>
+    <div class="bar"><button class="back" id="kBack">← もどる</button><h2>職人ランク</h2><span id="kXp"></span></div>
+    <p class="note">卵を剥くと、<em>スコアの10分の1</em>が経験値になります（黄金の卵は2倍、失敗すると0）。ランクが上がると道具が良くなって、剥くのが楽になります。</p>
+    <div class="rlist" id="kList"></div>
+  </section>
+
   <section class="screen" id="help" hidden>
     <div class="bar"><span></span><h2>遊び方</h2><span></span></div>
     <div class="helpcards">
@@ -204,6 +224,8 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
       <div class="hc"><b>薄皮ゲージ</b><p>満タンになると薄皮が破れて失敗。スプーンを控えめに、針でこまめにひびを入れよう。</p></div>
       <div class="hc"><b>コツ</b><p>卵ごとに<em>剥き心地がちがう</em>。殻の厚さ、薄皮の強さ、針の効き…。卵を選ぶ画面の説明をチェック。大きな破片は「大物」、テンポよく剥くと「連続」でボーナス。</p></div>
       <div class="hc"><b>中身</b><p>殻を全部剥くと、中身がお披露目。<em>ふつう・ちょっとレア・レア・激レア・幻</em>の5段階。卵が進むほど、新しい中身に出会えます。</p></div>
+      <div class="hc"><b>星</b><p>★1：薄皮を破らずに全部剥く<br>★2：さらに薄皮の傷が<em>60%未満</em><br>★3：さらに傷<em>30%未満</em>で<em>3分20秒以内</em><br>（エッグアートは ★2 傷65%未満／★3 傷35%未満で4分以内）</p></div>
+      <div class="hc"><b>職人ランク</b><p>剥くたびに経験値がたまり、ランクが上がると<em>道具が良くなる</em>。タイトル画面のランク欄をタップすると一覧が見られます。</p></div>
     </div>
     <button class="btn" id="helpClose">続ける</button>
   </section>
@@ -212,6 +234,7 @@ button:focus-visible{outline:3px solid var(--yolk);outline-offset:3px}
     <div class="res">
       <h2 id="rTitle">はだかになった！</h2>
       <div class="stars" id="rStars"></div>
+      <div class="starnote" id="rStarNote"></div>
       <div class="stats" id="rStats"></div>
       <div class="surprise" id="rSurprise"></div>
       <div class="rankup" id="rRank" hidden></div>
@@ -305,7 +328,13 @@ const EGGS=[
   {id:'giant',name:'巨人の卵',monster:true,scale:2.3,pieces:110,shell:[214,200,176],pattern:'pores',thick:[2,3.2],mem:1.2,feat:'とにかく巨大。破片110枚',contents:[['big',50],['minis',35],['eggInEgg',12],['rainbow',3]]},
   {id:'maou',name:'魔王の卵',monster:true,scale:1.25,pieces:62,shell:[58,20,70],pattern:'maou',thick:[2,3.2],mem:1.25,dark:true,melt:.1,zap:7,feat:'ひびが見えず、溶けて、勝手に割れる。最終試練',contents:[['maou',70],['eye',20],['crown',8],['rainbow',2]]},
 ];
-const RANKS=[{name:'見習い',xp:0},{name:'一人前',xp:300},{name:'熟練',xp:900},{name:'名人',xp:2000},{name:'達人',xp:4000}];
+const RANKS=[
+  {name:'見習い',xp:0,short:'',gain:['スプーン（ステンレス）・針（縫い針）・ピンセット（ふつう）でスタート']},
+  {name:'一人前',xp:300,short:'針が細くなる',gain:['針 → 細い針：薄皮への負担が40%へる','ひびの入る範囲も少し広がる']},
+  {name:'熟練',xp:900,short:'ピンセットが精密に',gain:['ピンセット → 精密：まわりが半分割れていれば剥がせる','無理に剥がしたときの傷が半分に']},
+  {name:'名人',xp:2000,short:'スプーンが木のさじに',gain:['スプーン → 木のさじ：薄皮への負担が30%へる']},
+  {name:'達人',xp:4000,short:'すべての道具が金色に',gain:['金のさじ：負担40%へ・金の針：負担50%へ、範囲さらに広く','金の精密ピンセット：まわりが4割割れていれば剥がせる']},
+];
 const SPOON_DMG=2.1, NEEDLE_DMG=.18, PEEL_FAIL=.75;   // membrane strain per action (the gauge is 100)
 const TOOLTIER=[   // what each craftsman rank does to the tools
   {spoon:'ステンレス',needle:'縫い針',tweezers:'ふつう',   spoonDmg:1,  needleDmg:1,  needleR:.26,peelDmg:1,  partial:.75},
@@ -763,13 +792,17 @@ function finish(ok,why){
   else {SFX.tear(); buzz([60,40,60]); G.membrane.material=membraneMat.clone(); G.membrane.material.color.set('#e9c98a'); toast(why||'薄皮が破れた…',why?'':'白身がとろ〜り。次は優しく',2);}
   G.resTimer=setTimeout(showResult,ok?(G.kind==='art'?2800:4200):1700);
 }
+// what each star asks for, so the result can show it
+function starRules(pct,dmg,t){const art=G.kind==='art', ok=!G.failed&&(art||pct>=100);
+  return art?[{l:'お題を完成させる',ok},{l:'薄皮の傷 65%未満',ok:ok&&dmg<65},{l:'傷 35%未満 ＆ 4:00以内',ok:ok&&dmg<35&&t<=240}]
+            :[{l:'薄皮を破らずに全部剥く',ok},{l:'薄皮の傷 60%未満',ok:ok&&dmg<60},{l:'傷 30%未満 ＆ 3:20以内',ok:ok&&dmg<30&&t<=200}];}
 function scoreOf(){
   const pct=Math.round(G.removedArea/G.egg.total*100), dmg=Math.round(G.dmg), t=Math.round(G.t);
-  if(G.kind==='art'){const score=G.failed?0:400+Math.round((100-dmg)*4)+Math.max(0,300-t)+G.bonus; const stars=G.failed?0:dmg<35&&t<=240?3:dmg<65?2:1; return {pct,dmg,t,score,stars};}
+  const rules=starRules(pct,dmg,t); let stars=0; for(const r of rules){if(r.ok) stars++; else break;}
+  if(G.kind==='art'){const score=G.failed?0:400+Math.round((100-dmg)*4)+Math.max(0,300-t)+G.bonus; return {pct,dmg,t,score,stars,rules};}
   let score=pct*6+Math.round((100-dmg)*3)+Math.max(0,(300-t))+G.bonus;
-  let stars=0; if(!G.failed&&pct>=100){stars=1; if(dmg<60) stars=2; if(dmg<30&&t<=200) stars=3;}
   if(G.failed) score=Math.round(score*.3);
-  return {pct,dmg,t,score,stars};
+  return {pct,dmg,t,score,stars,rules};
 }
 const fmtT=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 function showResult(){
@@ -785,11 +818,12 @@ function showResult(){
   $('reveal').className=''; $('reveal').style.opacity=0;
   $('rTitle').textContent=G.failed?(G.timeout?'時間切れ…':'薄皮が破れた…'):G.kind==='art'?(r.stars>=3?'見事なエッグアート！':'エッグアート完成！'):(r.dmg<10?'神剥き！':'はだかになった！');
   $('rStars').innerHTML=[0,1,2].map(i=>`<span class="${i<r.stars?'':'off'}">★</span>`).join('');
+  $('rStarNote').innerHTML=r.rules.map((x,i)=>`<div class="${x.ok?'ok':'ng'}"><span>${'★'.repeat(i+1)}　${x.l}</span><span>${x.ok?'達成':'—'}</span></div>`).join('');
   $('rStats').innerHTML=`<div><b>${r.pct}%</b><span>剥けた割合</span></div><div><b>${r.dmg}%</b><span>薄皮の傷</span></div><div><b>${fmtT(r.t)}</b><span>タイム</span></div>`;
   const sp=$('rSurprise');
   if(G.kind!=='art'){sp.hidden=false; sp.innerHTML=`${contentIcon(G.egg.inside)}<div>${newOne?'<span class="new">図鑑に新しく登録！</span>':''}<b>中身は「${C.name}」</b><span class="tl" style="color:${TIERS[tierOf(E,G.egg.inside)].color}">${TIERS[tierOf(E,G.egg.inside)].name}</span><p>${C.fact}</p></div>`;} else sp.hidden=true;
   const after=rankIdx(); const rr=$('rRank'); const notes=[];
-  if(after>before) notes.push(`職人ランクが「${RANKS[after].name}」に！ 道具が良くなった`);
+  if(after>before) notes.push(`職人ランクが「${RANKS[after].name}」に！<br><small>${RANKS[after].gain.join('<br>')}</small>`); else if(!G.failed){const nx=RANKS[after+1]; if(nx) notes.push(`<small>経験値 +${Math.round(r.score/10*(E.xp||1))} ・ 次の「${nx.name}」まで ${nx.xp-S.xp}</small>`);}
   if(unlockedNow) notes.push(`新しい卵「${unlockedNow.name}」が届いた！`);
   rr.hidden=!notes.length; rr.innerHTML=notes.join('<br>');
   const sh=$('rShare'); sh.hidden=G.kind!=='daily';
@@ -890,12 +924,12 @@ function frame(now){
 }
 
 /* ---------- menus ---------- */
-function showScreen(id){['title','pick','zukan','result','help'].forEach(s=>$(s).hidden=s!==id); G.mode=id?'menu':'play'; if(id){$('hud').hidden=true; applyCandle(0);}}
+function showScreen(id){['title','pick','zukan','result','help','ranks'].forEach(s=>$(s).hidden=s!==id); G.mode=id?'menu':'play'; if(id){$('hud').hidden=true; applyCandle(0);}}
 function keyOf(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function todayKey(){return keyOf(new Date());}
 function renderTitle(){
   const r=rankIdx(), cur=RANKS[r], nx=RANKS[r+1];
-  $('rankBox').innerHTML=`<div class="row"><span>職人ランク</span><b>${cur.name}</b></div><div class="meter"><i style="width:${nx?clamp((S.xp-cur.xp)/(nx.xp-cur.xp)*100,0,100):100}%"></i></div><div class="next">${nx?`次の「${nx.name}」まで ${nx.xp-S.xp} 点 ・ 道具が良くなる`:'最高ランク。すべての道具が金色に'}</div>`;
+  $('rankBox').innerHTML=`<div class="row"><span>職人ランク</span><b>${cur.name}</b></div><div class="meter"><i style="width:${nx?clamp((S.xp-cur.xp)/(nx.xp-cur.xp)*100,0,100):100}%"></i></div><div class="next">${nx?`次の「${nx.name}」まで ${nx.xp-S.xp} 点：${nx.short}`:'最高ランク。すべての道具が金色に'}</div><div class="next">タップでランク一覧 ›</div>`;
   $('mSound').textContent='音：'+(S.sound?'オン':'オフ');
   const d=S.daily[todayKey()]; $('mDaily').textContent=d?`今日の卵（挑戦済み・${d.score}点）`:'今日の卵';
   showScreen('title'); menuEgg();
@@ -951,10 +985,19 @@ function openZukan(){
   $('zCount').textContent=`${found} / ${all}`;
   showScreen('zukan');
 }
+function openRanks(){
+  const r=rankIdx(); $('kXp').textContent=`${S.xp} 点`;
+  $('kList').innerHTML=RANKS.map((k,i)=>{const T=TOOLTIER[i];
+    return `<div class="rl${i===r?' cur':''}${i>r?' lock':''}"><div class="h"><b>${i===r?'▶ ':''}${k.name}</b><span>${k.xp} 点〜${i>r?`（あと ${k.xp-S.xp}）`:i<r?' 達成':' いまここ'}</span></div>
+      <ul>${k.gain.map(g=>`<li>${g}</li>`).join('')}<li style="color:var(--muted)">道具：${T.spoon}／${T.needle}／${T.tweezers}</li></ul></div>`;}).join('');
+  showScreen('ranks');
+}
 function copyText(t){navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>toast('コピーしました','',1)).catch(()=>{});}
 $('mPeel').onclick=()=>{audio(); openPick();};
 $('mArt').onclick=()=>{audio(); openArt();};
 $('mDaily').onclick=()=>{audio(); openDaily();};
+$('rankBox').onclick=()=>{audio(); openRanks();};
+$('kBack').onclick=()=>renderTitle();
 $('mZukan').onclick=()=>{audio(); openZukan();};
 $('mSound').onclick=()=>{S.sound=!S.sound; save(); renderTitle();};
 $('pBack').onclick=$('zBack').onclick=()=>renderTitle();
